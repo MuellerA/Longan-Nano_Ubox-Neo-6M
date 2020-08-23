@@ -71,7 +71,8 @@ void DispPos::set(int32_t lat, int32_t lon, int32_t alt)
       return ;
     _lat = lat ;
     int32_t  g = lat / 10000 ;
-    uint32_t t = lat - g*10000 ;
+    int32_t t = lat - g*10000 ;
+    if (t < 0) t = -t ;
     _laLat.txtPos(0) ;
     _laLat.put(g) ;
     _laLat.put('.') ;
@@ -84,7 +85,8 @@ void DispPos::set(int32_t lat, int32_t lon, int32_t alt)
       return ;
     _lon = lon ;
     int32_t  g = lon / 10000 ;
-    uint32_t t = lon - g*10000 ;
+    int32_t t = lon - g*10000 ;
+    if (t < 0) t = -t ;
     _laLon.txtPos(0) ;
     _laLon.put(g) ;
     _laLon.put('.') ;
@@ -92,17 +94,18 @@ void DispPos::set(int32_t lat, int32_t lon, int32_t alt)
     _laLon.fill(_laLon.x(), _laLon.xMax()-_laLon.x(), _laLon.y()-_laLon.baseLineOffset(), _laLon.font()->yAdvance) ;
   }
   {
-  alt /= 100 ;
-  if (alt == _alt)
-    return ;
-  _alt = alt ;
-  int32_t  g = alt / 10 ;
-  uint32_t t = alt - g*10 ;
-  _laAlt.txtPos(0) ;
-  _laAlt.put(g) ;
-  _laAlt.put('.') ;
-  _laAlt.put(t) ;
-  _laAlt.fill(_laAlt.x(), _laAlt.xMax()-_laAlt.x(), _laAlt.y()-_laAlt.baseLineOffset(), _laAlt.font()->yAdvance) ;
+    alt /= 100 ;
+    if (alt == _alt)
+      return ;
+    _alt = alt ;
+    int32_t  g = alt / 10 ;
+    int32_t t = alt - g*10 ;
+    if (t < 0) t = -t ;
+    _laAlt.txtPos(0) ;
+    _laAlt.put(g) ;
+    _laAlt.put('.') ;
+    _laAlt.put(t) ;
+    _laAlt.fill(_laAlt.x(), _laAlt.xMax()-_laAlt.x(), _laAlt.y()-_laAlt.baseLineOffset(), _laAlt.font()->yAdvance) ;
   }
 }
 

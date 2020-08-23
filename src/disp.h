@@ -16,7 +16,7 @@ using ::RV::Longan::Lcd ;
 using ::RV::Longan::LcdArea ;
 
 ////////////////////////////////////////////////////////////////////////////////
-//   |  title 0, 110             | fix 115, 20 | nChan 135, 20 | two 155, 5 |
+//   |  title 0, 110             | fix 115, 20 | nChan 135, 20 | tow 155, 5 |
 //   |  time 0, 160                                                         |
 //   |  lat lbl 0, 40     | lat val 40, 120                                 |
 //   |  lon lbl 0, 40     | lon val 40, 120                                 |
