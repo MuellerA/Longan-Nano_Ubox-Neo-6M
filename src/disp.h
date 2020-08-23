@@ -2,6 +2,8 @@
 // disp.h
 ////////////////////////////////////////////////////////////////////////////////
 
+#pragma once
+
 extern "C"
 {
   #include "gd32vf103.h"
@@ -18,9 +20,9 @@ using ::RV::Longan::LcdArea ;
 ////////////////////////////////////////////////////////////////////////////////
 //   |  title 0, 110             | fix 115, 20 | nChan 135, 20 | tow 155, 5 |
 //   |  time 0, 160                                                         |
-//   |  lat lbl 0, 40     | lat val 40, 120                                 |
-//   |  lon lbl 0, 40     | lon val 40, 120                                 |
-//   |  alt lbl 0, 40     | alt val 40, 120                                 |
+//   |  lat lbl 0, 40     | lat val 40, 100                                 |
+//   |  lon lbl 0, 40     | lon val 40, 100                                 |
+//   |  alt lbl 0, 40     | alt val 40, 100                  | asc 150,10   |
 ////////////////////////////////////////////////////////////////////////////////
 
 class DispTime
@@ -76,9 +78,19 @@ private:
   bool      _toggle ;
 } ;
 
+class DispAscFound
+{
+public:
+  DispAscFound(uint32_t timeout) ;
+  void set() ;
+  void expire() ;
+private:
+  TickTimer _t ;
+  LcdArea   _la ;
+} ;
+
 ////////////////////////////////////////////////////////////////////////////////
 
-void dispAscFound() ;
 void dispSetup() ;
 
 ////////////////////////////////////////////////////////////////////////////////

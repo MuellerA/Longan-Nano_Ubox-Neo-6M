@@ -2,6 +2,8 @@
 // ubx.h
 ////////////////////////////////////////////////////////////////////////////////
 
+#pragma once
+
 extern "C"
 {
   #include "gd32vf103.h"
@@ -161,7 +163,7 @@ bool navSvinfo(const std::vector<uint8_t> &data, uint32_t &iTOW, uint8_t &nChan)
 bool navStatus(const std::vector<uint8_t> &data, uint32_t &iTOW, uint8_t &gpsFix) ;
 bool navTimeUtc(const std::vector<uint8_t> &data, uint32_t &iTOW, uint16_t &year, uint8_t &month, uint8_t &day, uint8_t &hour, uint8_t &min, uint8_t &sec, uint8_t &valid) ;
 
-void ubxSetup() ;
+void ubxSetup(LcdArea &la) ;
 
 ////////////////////////////////////////////////////////////////////////////////
 // EOF

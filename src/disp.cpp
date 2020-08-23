@@ -13,7 +13,7 @@ Lcd &lcd(Lcd::lcd()) ;
 DispTime::DispTime(uint32_t timeout) :
   _t(timeout), _la(lcd), _iTOW{0xffffffff}
 {
-  _la.area(0, 160, 16, 16) ;
+  _la.area(0, 160, 16, 16) ; _la.clear() ;
 }
 
 void DispTime::set(uint32_t iTOW, uint16_t year, uint8_t month, uint8_t day, uint8_t hour, uint8_t min, uint8_t sec, uint8_t valid)
@@ -35,7 +35,7 @@ void DispTime::set(uint32_t iTOW, uint16_t year, uint8_t month, uint8_t day, uin
   _la.put(min, 2, '0') ;
   _la.put(':') ;
   _la.put(sec, 2, '0') ;
-  _la.fill(_la.x(), _la.xMax()-_la.x(), _la.y()-_la.baseLineOffset(), _la.font()->yAdvance) ;
+  _la.clearEOL() ;
 }
 
 void DispTime::expire()
@@ -53,13 +53,13 @@ DispPos::DispPos(uint32_t timeout) :
   _t(timeout), _laLat(lcd), _laLon(lcd), _laAlt(lcd), _lat{0x7fffffff}, _lon{0x7fffffff}, _alt{0x7fffffff}
 {
   _laLat.area( 0,  40, 32, 16) ; _laLat.clear() ; _laLat.put("Lat") ;
-  _laLat.area(40, 120, 32, 16) ; _laLat.clear() ;
+  _laLat.area(40, 100, 32, 16) ; _laLat.clear() ;
 
   _laLon.area( 0,  40, 48, 16) ; _laLon.clear() ; _laLon.put("Lon") ;
-  _laLon.area(40, 120, 48, 16) ; _laLon.clear() ;
+  _laLon.area(40, 100, 48, 16) ; _laLon.clear() ;
 
   _laAlt.area( 0,  40, 64, 16) ; _laAlt.clear() ; _laAlt.put("Alt") ;
-  _laAlt.area(40, 120, 64, 16) ; _laAlt.clear() ;
+  _laAlt.area(40, 100, 64, 16) ; _laAlt.clear() ;
 }
 
 void DispPos::set(int32_t lat, int32_t lon, int32_t alt)
@@ -77,7 +77,7 @@ void DispPos::set(int32_t lat, int32_t lon, int32_t alt)
     _laLat.put(g) ;
     _laLat.put('.') ;
     _laLat.put(t, 4, '0') ;
-    _laLat.fill(_laLat.x(), _laLat.xMax()-_laLat.x(), _laLat.y()-_laLat.baseLineOffset(), _laLat.font()->yAdvance) ;
+    _laLat.clearEOL() ;
   }
   {
     lon /= 1000 ;
@@ -91,7 +91,7 @@ void DispPos::set(int32_t lat, int32_t lon, int32_t alt)
     _laLon.put(g) ;
     _laLon.put('.') ;
     _laLon.put(t, 4, '0') ;
-    _laLon.fill(_laLon.x(), _laLon.xMax()-_laLon.x(), _laLon.y()-_laLon.baseLineOffset(), _laLon.font()->yAdvance) ;
+    _laLon.clearEOL() ;
   }
   {
     alt /= 100 ;
@@ -101,11 +101,12 @@ void DispPos::set(int32_t lat, int32_t lon, int32_t alt)
     int32_t  g = alt / 10 ;
     int32_t t = alt - g*10 ;
     if (t < 0) t = -t ;
+
     _laAlt.txtPos(0) ;
     _laAlt.put(g) ;
     _laAlt.put('.') ;
     _laAlt.put(t) ;
-    _laAlt.fill(_laAlt.x(), _laAlt.xMax()-_laAlt.x(), _laAlt.y()-_laAlt.baseLineOffset(), _laAlt.font()->yAdvance) ;
+    _laAlt.clearEOL() ;
   }
 }
 
@@ -138,7 +139,7 @@ void DispInd::set(int8_t ind)
   _ind = ind ;
   _la.txtPos(0) ;
   _la.put(ind) ;
-  _la.fill(_la.x(), _la.xMax()-_la.x(), _la.y()-_la.baseLineOffset(), _la.font()->yAdvance) ;
+  _la.clearEOL() ;
 }
 
 void DispInd::expire()
@@ -177,10 +178,27 @@ void DispTow::expire()
 
 ////////////////////////////////////////////////////////////////////////////////
 
-void dispAscFound()
+DispAscFound::DispAscFound(uint32_t timeout) :
+  _t(timeout), _la(lcd)
 {
-  lcd.put('$') ;
+  _la.area(150, 10, 64, 16) ; _la.clear() ;
 }
+
+void DispAscFound::set()
+{
+  _t.restart() ;
+  _la.txtPos(0) ;
+  _la.put('$') ;
+  _la.clearEOL() ;
+}
+
+void DispAscFound::expire()
+{
+  if (_t())
+    _la.clear() ;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 
 void dispSetup()
 {

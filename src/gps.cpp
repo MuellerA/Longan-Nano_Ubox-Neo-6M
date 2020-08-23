@@ -2,15 +2,19 @@
 // gps.cpp
 ////////////////////////////////////////////////////////////////////////////////
 
-#include "ubx.h"
 #include "disp.h"
+#include "ubx.h"
+
+bool ubxAscFound ;
 
 ////////////////////////////////////////////////////////////////////////////////
 
 int main()
 {
   dispSetup() ;
-  ubxSetup() ;
+
+  LcdArea laUbx(Lcd::lcd(), 0, 160, 16, 16) ;
+  ubxSetup(laUbx) ;
 
   UbxRx ubxRx ;
 
@@ -19,9 +23,16 @@ int main()
   DispTime   dispTime( 5000) ;
   DispPos    dispPos (10000) ;
   DispTow    dispTow (10000) ;
-
+  DispAscFound dispAscFound(1100) ;
+  
   while (true)
   {
+    if (ubxAscFound)
+    {
+      ubxAscFound = false ;
+      dispAscFound.set() ;
+    }
+    
     if (ubxRx.poll())
     {
       if (ubxRx.valid())
@@ -74,6 +85,7 @@ int main()
       dispTime  .expire() ;
       dispPos   .expire() ;
       dispTow   .expire() ;
+      dispAscFound.expire() ;
     }
   }
 }

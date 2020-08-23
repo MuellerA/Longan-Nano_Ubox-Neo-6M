@@ -2,6 +2,7 @@
 // ubx.cpp
 ////////////////////////////////////////////////////////////////////////////////
 
+#include "disp.h"
 #include "ubx.h"
 
 #include "GD32VF103/time.h"
@@ -209,7 +210,7 @@ void UbxRx::reset()
   _chkBcalc = 0 ;
 }
 
-extern void dispAscFound() ;
+extern bool ubxAscFound ;
 bool UbxRx::poll()
 {
   static enum { waitB5, wait62, collect } state(waitB5) ;
@@ -223,7 +224,7 @@ bool UbxRx::poll()
       if (b == 0xb5)
         state = wait62 ;
       else if (b == '$')
-        dispAscFound() ;
+        ubxAscFound = true ;
       break ;
     case wait62:
       if (b == 0x62)
@@ -279,14 +280,58 @@ bool UbxRx::is(uint8_t clsId, uint8_t msgId, uint16_t len) const
 
 ////////////////////////////////////////////////////////////////////////////////
 
-void ubxSetup()
+bool ubxPoll(const UbxTx &tx)
 {
-  std::vector<UbxTx> cfg
+  TickTimer t(500) ;
+  UbxRx rx ;
+  tx.send() ;
+  while (true)
+  {
+    if (t())
+      return false ;
+
+    if (rx.poll())
+    {
+      if (rx.valid() && rx.is(5, 1) && ack(tx.clsId(), tx.msgId(), rx.data()))
+        return true ;
+
+      rx.reset() ;
+    }
+  }
+}
+
+bool ubxTryBaud(uint32_t tryBaud)
+{
+  UbxTx tx(0x06, 0x00, std::vector<uint8_t>()) ;
+  
+  TickTimer::delayMs(200) ;
+  usart.baud(tryBaud) ;
+  TickTimer::delayMs(100) ;
+  
+  usart.clear() ;
+
+  return ubxPoll(tx) ;
+}
+
+uint32_t ubxGetBaud(LcdArea &la)
+{
+  std::vector<uint32_t> tryBauds{115200, 9600, 19200, 38400, 57600, 4800} ;
+  for (uint32_t tryBaud : tryBauds)
+  {
+    la.clear() ; la.put("Probing ") ; la.put(tryBaud) ; la.put(" baud") ;
+    if (ubxTryBaud(tryBaud))
+      return tryBaud ;
+  }
+  return 0 ;                   
+}
+
+void ubxSetup(LcdArea &la)
+{
+  UbxTx txCfgPrtUart1{ 0x06, 0x00, cfgPrtUart(1, 0b0000100011000000, 115200, 0b111, 0b001) } ;
+  
+  std::vector<UbxTx> txCfg
     {
       // cfg-prt // disable ports
-//    { 0x06, 0x00, cfgPrtUart(1, 0b0000100011000000, 115200, 0b111, 0b001) },
-//    { 0x06, 0x00, cfgPrtUart(1, 0b0000100011000000,  19200, 0b111, 0b001) },
-      { 0x06, 0x00, cfgPrtUart(1, 0b0000100011000000,   9600, 0b111, 0b001) },
       { 0x06, 0x00, cfgPrtUart(2, 0b0000100011000000,   9600, 0b000, 0b000) },
       { 0x06, 0x00, cfgPrtDdc(0b00000000, 0b000, 0b000) },
       { 0x06, 0x00, cfgPrtUsb(0b000, 0b000) },
@@ -299,22 +344,29 @@ void ubxSetup()
     } ;
 
   usart.setup(9600) ;
-  
-  UbxRx ubxRx ;
-  for (const UbxTx &tx : cfg)
+
+ tryBaud:
+  uint32_t baud{0} ;
+  while (!baud)
+    baud = ubxGetBaud(la) ;
+  if (baud != 115200)
   {
-    TickTimer t(1000, 0UL, true) ;
-    bool found{false} ;
-    while (!found)
-    {
-      if (t())
-        tx.send() ;
-      if (ubxRx.poll())
-      {
-        found = ubxRx.valid() && ubxRx.is(5, 1) && ack(tx.clsId(), tx.msgId(), ubxRx.data()) ;
-        ubxRx.reset() ;
-      }
-    }
+    la.clear() ; la.put("Setting to 115200") ;
+    UbxTx tx{ 0x06, 0x00, cfgPrtUart(1, 0b0000100011000000, 115200, 0b111, 0b001) } ;
+    txCfgPrtUart1.send() ;
+
+    if (!ubxTryBaud(115200))
+      goto tryBaud ;
+  }
+  else
+  {
+    txCfgPrtUart1.send() ;
+  }
+  
+  for (const UbxTx &tx : txCfg)
+  {
+    la.clear() ; la.put("Configuring") ;
+    while (!ubxPoll(tx)) ;
   }
 }
 
