@@ -4,10 +4,16 @@
 
 #include "gps.h"
 #include "ubx.h"
+#include "disp.h"
+
+#include "GD32VF103/time.h"
+#include "GD32VF103/usart.h"
+
+using ::RV::GD32VF103::TickTimer ;
+using ::RV::GD32VF103::Usart ;
 
 ////////////////////////////////////////////////////////////////////////////////
 
-Lcd& lcd(Lcd::lcd()) ;
 Usart& usart(Usart::usart0()) ;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -218,7 +224,7 @@ bool GpsRx::poll()
       if (b == 0xb5)
         state = wait62 ;
       else if (b == '$')
-        lcd.put('$') ;
+        dispAscFound() ;
       break ;
     case wait62:
       if (b == 0x62)
@@ -274,177 +280,6 @@ bool GpsRx::is(uint8_t clsId, uint8_t msgId, uint16_t len) const
 
 ////////////////////////////////////////////////////////////////////////////////
 
-UbxData::UbxData(uint32_t line, const char *label, uint32_t timeout) :
-  _t(timeout), _la(lcd)
-{
-  if (label)
-  {
-    _la.area( 0,  40, 16*line, 16) ; _la.clear() ; _la.put(label) ;
-    _la.area(40, 120, 16*line, 16) ; _la.clear() ;
-  }
-  else
-  {
-    _la.area(00, 160, 16*line, 16) ; _la.clear() ;
-  }
-}
-
-UbxData::UbxData(uint32_t x, uint32_t timeout) :
-  _t(timeout), _la(lcd)
-{
-  _la.area(x, 20, 0, 16) ; _la.clear() ;
-}
-
-UbxData::UbxData(uint32_t timeout) :
-  _t(timeout), _la(lcd)
-{
-  _la.area(155, 5, 0, 5) ; _la.clear() ;
-}
-
-UbxTime::UbxTime(uint32_t line, const char *label, uint32_t timeout) :
-  UbxData(line, label, timeout), _iTOW{0xffffffff}
-{
-}
-
-void UbxTime::set(uint32_t iTOW, uint16_t year, uint8_t month, uint8_t day, uint8_t hour, uint8_t min, uint8_t sec, uint8_t valid)
-{
-  _t.restart() ;
-  iTOW /= 1000 ;
-  if ((iTOW == _iTOW) || !(valid & 0b100))
-    return ;
-  _iTOW = iTOW ;
-  _la.txtPos(0) ;
-  _la.put(year, 4, '0') ;
-  _la.put('-') ;
-  _la.put(month, 2, '0') ;
-  _la.put('-') ;
-  _la.put(day, 2, '0') ;
-  _la.put(' ') ;
-  _la.put(hour, 2, '0') ;
-  _la.put(':') ;
-  _la.put(min, 2, '0') ;
-  _la.put(':') ;
-  _la.put(sec, 2, '0') ;
-  _la.fill(_la.x(), _la.xMax()-_la.x(), _la.y()-_la.baseLineOffset(), _la.font()->yAdvance) ;
-}
-
-void UbxTime::expire()
-{
-  if (_t())
-  {
-    _la.clear() ;
-    _iTOW = 0xffffffff; 
-  }
-}
-
-UbxLatLon::UbxLatLon(uint32_t line, const char *label, uint32_t timeout) :
-  UbxData(line, label, timeout), _deg{0x7fffffff}
-{
-}
-
-void UbxLatLon::set(int32_t deg)
-{
-  _t.restart() ;
-  deg /= 1000 ;
-  if (deg == _deg)
-    return ;
-  _deg = deg ;
-  int32_t  g = deg / 10000 ;
-  uint32_t t = deg - g*10000 ;
-  _la.txtPos(0) ;
-  _la.put(g) ;
-  _la.put('.') ;
-  _la.put(t, 4, '0') ;
-  _la.fill(_la.x(), _la.xMax()-_la.x(), _la.y()-_la.baseLineOffset(), _la.font()->yAdvance) ;
-}
-
-void UbxLatLon::expire()
-{
-  if (_t())
-  {
-    _la.clear() ;
-    _deg = 0x7fffffff; 
-  }
-}
-  
-UbxAlt::UbxAlt(uint32_t line, const char *label, uint32_t timeout) :
-  UbxData(line, label, timeout), _alt{0x7fffffff}
-{
-}
-
-void UbxAlt::set(int32_t alt)
-{
-  _t.restart() ;
-  alt /= 100 ;
-  if (alt == _alt)
-    return ;
-  _alt = alt ;
-  int32_t  g = alt / 10 ;
-  uint32_t t = alt - g*10 ;
-  _la.txtPos(0) ;
-  _la.put(g) ;
-  _la.put('.') ;
-  _la.put(t) ;
-  _la.fill(_la.x(), _la.xMax()-_la.x(), _la.y()-_la.baseLineOffset(), _la.font()->yAdvance) ;
-}
-
-void UbxAlt::expire()
-{
-  if (_t())
-  {
-    _la.clear() ;
-    _alt = 0x7fffffff; 
-  }
-}
-  
-UbxInd::UbxInd(uint32_t x, uint32_t timeout) :
-  UbxData(x, timeout), _ind{0xff}
-{
-}
-
-void UbxInd::set(int8_t ind)
-{
-  _t.restart() ;
-  if (ind == _ind)
-    return ;
-  _ind = ind ;
-  _la.txtPos(0) ;
-  _la.put(ind) ;
-  _la.fill(_la.x(), _la.xMax()-_la.x(), _la.y()-_la.baseLineOffset(), _la.font()->yAdvance) ;
-}
-
-void UbxInd::expire()
-{
-  if (_t())
-  {
-    _la.clear() ;
-    _ind = 0xff ; 
-  }
-}
-
-UbxTow::UbxTow(uint32_t timeout) :
-  UbxData(timeout), _tow{0xffffffff}, _toggle{false}
-{
-}
-
-void UbxTow::set(uint32_t tow)
-{
-  _t.restart() ;
-  tow /= 1000 ;
-  if (tow == _tow)
-    return ;
-  _tow = tow ;
-  _la.clear(_toggle ? 0x00ff00 : 0x000000) ;
-  _toggle = !_toggle ;
-}
-
-void UbxTow::expire()
-{
-  if (_t())
-    _la.clear(0xff0000) ;
-}
-                  
-////////////////////////////////////////////////////////////////////////////////
-
 void initNeo6M()
 {
   std::vector<GpsTx> cfg
@@ -484,26 +319,19 @@ void initNeo6M()
 
 int main()
 {
-  lcd.setup() ;
+  dispSetup() ;
   usart.setup(9600) ;
-
-  LcdArea laTitle (lcd,   0, 110,  0, 16, &::RV::Longan::Roboto_Bold7pt7b     , 0xffffffUL, 0xa00000UL) ;
-
-  laTitle.clear() ;
-  laTitle.put("  GPS RECEIVER  ") ;
 
   GpsRx gpsRx ;
 
   initNeo6M() ;
   uint32_t iTOW ;
 
-  UbxInd    ubxGpsFix(115, 10000) ;
-  UbxInd    ubxNChan (135, 10000) ;
-  UbxTime   ubxTime(1, nullptr,  5000) ;
-  UbxLatLon ubxLat (2, "Lat"  , 10000) ;
-  UbxLatLon ubxLon (3, "Lon"  , 10000) ;
-  UbxAlt    ubxAlt (4, "Alt"  , 10000) ;
-  UbxTow    ubxTow (10000) ;
+  DispInd    dispGpsFix(115, 10000) ;
+  DispInd    dispNChan (135, 10000) ;
+  DispTime   dispTime( 5000) ;
+  DispPos    dispPos (10000) ;
+  DispTow    dispTow (10000) ;
   
   while (true)
   {
@@ -516,8 +344,8 @@ int main()
           uint8_t nChan ;
           if (navSvinfo(gpsRx.data(), iTOW, nChan))
           {
-            ubxTow  .set(iTOW) ;
-            ubxNChan.set(nChan) ;
+            dispTow  .set(iTOW) ;
+            dispNChan.set(nChan) ;
           }
         }
         else if (gpsRx.is(0x01, 0x03)) // NAV-STATUS
@@ -525,8 +353,8 @@ int main()
           uint8_t gpsFix ;
           if (navStatus(gpsRx.data(), iTOW, gpsFix))
           {
-            ubxTow   .set(iTOW) ;
-            ubxGpsFix.set(gpsFix) ;
+            dispTow   .set(iTOW) ;
+            dispGpsFix.set(gpsFix) ;
           }
         }
         else if (gpsRx.is(0x01, 0x02)) // NAV-POSLLH
@@ -534,10 +362,8 @@ int main()
           int32_t  lat, lon, alt ;
           if (navPosllh(gpsRx.data(), iTOW, lat, lon, alt))
           {
-            ubxTow .set(iTOW) ;
-            ubxLat .set(lat) ;
-            ubxLon .set(lon) ;
-            ubxAlt .set(alt) ;
+            dispTow.set(iTOW) ;
+            dispPos.set(lat, lon, alt) ;
           }
         }
         else if (gpsRx.is(0x01, 0x21)) // NAV-TIMEUTC
@@ -547,20 +373,18 @@ int main()
           uint8_t month, day, hour, min, sec, valid ;
           if (navTimeUtc(gpsRx.data(), iTOW, year, month, day, hour, min, sec, valid))
           {
-            ubxTow .set(iTOW) ;
-            ubxTime.set(iTOW, year, month, day, hour, min, sec, valid) ;
+            dispTow .set(iTOW) ;
+            dispTime.set(iTOW, year, month, day, hour, min, sec, valid) ;
           }
         }
       }
       gpsRx.reset() ;
 
-      ubxGpsFix.expire() ;
-      ubxNChan .expire() ;
-      ubxTime  .expire() ;
-      ubxLat   .expire() ;
-      ubxLon   .expire() ;
-      ubxAlt   .expire() ;
-      ubxTow   .expire() ;
+      dispGpsFix.expire() ;
+      dispNChan .expire() ;
+      dispTime  .expire() ;
+      dispPos   .expire() ;
+      dispTow   .expire() ;
     }
   }
 }
