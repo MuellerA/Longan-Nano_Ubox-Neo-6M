@@ -117,16 +117,16 @@ int main()
         }
       }
       ubxRx.reset() ;
-
-      dispGpsFix  .display(page, force) ;
-      dispSvInfo  .display(page, force) ;
-      dispTime    .display(page, force) ;
-      dispPos     .display(page, force) ;
-      dispTow     .display(page, force) ;
-      dispAscFound.display(page, force) ;
-
-      force = false ;
     }
+    
+    dispGpsFix  .display(page, force) ;
+    dispSvInfo  .display(page, force) ;
+    dispTime    .display(page, force) ;
+    dispPos     .display(page, force) ;
+    dispTow     .display(page, force) ;
+    dispAscFound.display(page, force) ;
+
+    force = false ;
   }
 }
 
