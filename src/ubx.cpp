@@ -17,13 +17,47 @@ Usart& usart(Usart::usart0()) ;
 
 ////////////////////////////////////////////////////////////////////////////////
 
-bool ack(uint8_t clsId, uint8_t msgId, const std::vector<uint8_t> data)
+UbxId::UbxId(uint8_t clsId, uint8_t msgId) :
+  _clsId{clsId}, _msgId{msgId}
+{
+}
+
+UbxId::UbxId() :
+  _clsId{0}, _msgId{0}
+{
+}
+
+bool UbxId::operator==(const UbxId &that) const
+{
+  return
+    (_clsId == that._clsId) &&
+    (_msgId == that._msgId) ;
+}
+
+uint8_t UbxId::clsId() const { return _clsId ; }
+uint8_t UbxId::msgId() const { return _msgId ; }
+uint8_t& UbxId::clsId() { return _clsId ; }
+uint8_t& UbxId::msgId() { return _msgId ; }
+
+UbxId UbxId::NavPosllh (0x01, 0x02) ;
+UbxId UbxId::NavStatus (0x01, 0x03) ;
+UbxId UbxId::NavTimeUtc(0x01, 0x21) ;
+UbxId UbxId::NavSvinfo (0x01, 0x30) ;
+
+UbxId UbxId::AckAck    (0x05, 0x01) ;
+
+UbxId UbxId::CfgPrt    (0x06, 0x00) ;
+UbxId UbxId::CfgMsg    (0x06, 0x01) ;
+
+////////////////////////////////////////////////////////////////////////////////
+
+bool ack(const UbxId &ubxId, const std::vector<uint8_t> data)
 {
   if (data.size() < sizeof(UbxAck))
     return false ;
 
   const UbxAck *ubx = (const UbxAck*) data.data() ;
-  return (clsId == ubx->clsId) && (msgId == ubx->msgId) ;
+  return (ubxId.clsId() == ubx->clsId) && (ubxId.msgId() == ubx->msgId) ;
 }
 
 bool navPosllh(const std::vector<uint8_t> &data, uint32_t &iTOW, int32_t &lon, int32_t &lat, int32_t &alt)
@@ -39,7 +73,7 @@ bool navPosllh(const std::vector<uint8_t> &data, uint32_t &iTOW, int32_t &lon, i
   return true ;
 }
 
-bool navSvinfo(const std::vector<uint8_t> &data, uint32_t &iTOW, uint8_t &nChan)
+bool navSvinfo(const std::vector<uint8_t> &data, uint32_t &iTOW, uint8_t &nChan, std::vector<SvInfo> &svInfos)
 {
   if (data.size() < sizeof(UbxNavSvinfo))
     return false ;
@@ -47,6 +81,30 @@ bool navSvinfo(const std::vector<uint8_t> &data, uint32_t &iTOW, uint8_t &nChan)
   const UbxNavSvinfo *ubx = (const UbxNavSvinfo*) data.data() ;
   iTOW = ubx->iTOW ;
   nChan = ubx->numCh ;
+
+  uint8_t n = (nChan > 16) ? 16 : nChan ;
+  svInfos.resize(nChan) ;
+  for (uint8_t i = 0 ; i < n ; ++i)
+  {
+    uint8_t chn, svid, flags, quality, cno ;
+    if (navSvinfoRep(data, i, chn, svid, flags, quality, cno))
+      svInfos[i] = SvInfo{chn, svid, flags, quality, cno} ;
+  }  
+  
+  return true ;
+}
+
+bool navSvinfoRep(const std::vector<uint8_t> &data, uint8_t index, uint8_t &chn, uint8_t &svid, uint8_t &flags, uint8_t &quality, uint8_t &cno)
+{
+  if (data.size() < (sizeof(UbxNavSvinfo) + (index+1) * sizeof(UbxNavSvinfoRep)))
+    return false ;
+
+  const UbxNavSvinfoRep *ubx = (const UbxNavSvinfoRep*) (data.data() + sizeof(UbxNavSvinfo) + index * sizeof(UbxNavSvinfoRep)) ;
+  chn = ubx->chn ;
+  svid = ubx->svid ;
+  flags = ubx->flags ;
+  quality = ubx->quality ;
+  cno = ubx->cno ;
   return true ;
 }
 
@@ -144,13 +202,13 @@ std::vector<uint8_t> cfgPrtDdc(uint32_t mode, uint16_t inProtoMask, uint16_t out
 
 ////////////////////////////////////////////////////////////////////////////////
 
-UbxTx::UbxTx(uint8_t clsId, uint8_t msgId, const std::vector<uint8_t>& data) :
-  _clsId{clsId}, _msgId{msgId}, _chkA(0), _chkB(0)
+UbxTx::UbxTx(const UbxId &ubxId, const std::vector<uint8_t>& data) :
+  _ubxId{ubxId}, _chkA(0), _chkB(0)
 {
   _data.push_back(0xb5) ;
   _data.push_back(0x62) ;
-  add(_clsId) ;
-  add(_msgId) ;
+  add(ubxId.clsId()) ;
+  add(ubxId.msgId()) ;
   uint16_t len = (uint16_t) data.size() ;
   add(len >> 0) ;
   add(len >> 8) ;
@@ -197,8 +255,6 @@ UbxRx::~UbxRx()
 
 void UbxRx::reset()
 {
-  _clsId    = 0 ;
-  _msgId    = 0;
   _len      = 0 ;
   _data.clear() ;
   _data.reserve(1000) ;
@@ -245,8 +301,8 @@ bool UbxRx::poll()
 
 bool UbxRx::addUbx(uint8_t b)
 {
-  if      (_idx == 0) { csum(b) ; _clsId = b ; }
-  else if (_idx == 1) { csum(b) ; _msgId = b ; }
+  if      (_idx == 0) { csum(b) ; _ubxId.clsId() = b ; }
+  else if (_idx == 1) { csum(b) ; _ubxId.msgId() = b ; }
   else if (_idx == 2) { csum(b) ; _len   = b ; }
   else if (_idx == 3) { csum(b) ; _len  += b*10 ; _size = _len + 6 ; }
   else if (_idx <  _size - 2) { csum(b) ; _data.push_back(b) ; }
@@ -268,14 +324,14 @@ bool UbxRx::valid() const
   return (_chkA == _chkAcalc) && (_chkB == _chkBcalc) ;
 }
 
-bool UbxRx::is(uint8_t clsId, uint8_t msgId) const
+bool UbxRx::is(const UbxId &ubxId) const
 {
-  return (_clsId == clsId) && (_msgId == msgId) ;
+  return (_ubxId == ubxId) ;
 }
 
-bool UbxRx::is(uint8_t clsId, uint8_t msgId, uint16_t len) const
+bool UbxRx::is(const UbxId &ubxId, uint16_t len) const
 {
-  return (_clsId == clsId) && (_msgId == msgId) && (len == _data.size()) ;
+  return (_ubxId == ubxId) && (len == _data.size()) ;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -292,7 +348,7 @@ bool ubxPoll(const UbxTx &tx)
 
     if (rx.poll())
     {
-      if (rx.valid() && rx.is(5, 1) && ack(tx.clsId(), tx.msgId(), rx.data()))
+      if (rx.valid() && rx.is(UbxId::AckAck) && ack(tx.ubxId(), rx.data()))
         return true ;
 
       rx.reset() ;
@@ -302,7 +358,7 @@ bool ubxPoll(const UbxTx &tx)
 
 bool ubxTryBaud(uint32_t tryBaud)
 {
-  UbxTx tx(0x06, 0x00, std::vector<uint8_t>()) ;
+  UbxTx tx(UbxId::CfgPrt, std::vector<uint8_t>()) ;
   
   TickTimer::delayMs(200) ;
   usart.baud(tryBaud) ;
@@ -327,20 +383,20 @@ uint32_t ubxGetBaud(LcdArea &la)
 
 void ubxSetup(LcdArea &la)
 {
-  UbxTx txCfgPrtUart1{ 0x06, 0x00, cfgPrtUart(1, 0b0000100011000000, 115200, 0b111, 0b001) } ;
+  UbxTx txCfgPrtUart1{ UbxId::CfgPrt, cfgPrtUart(1, 0b0000100011000000, 115200, 0b111, 0b001) } ;
   
   std::vector<UbxTx> txCfg
     {
       // cfg-prt // disable ports
-      { 0x06, 0x00, cfgPrtUart(2, 0b0000100011000000,   9600, 0b000, 0b000) },
-      { 0x06, 0x00, cfgPrtDdc(0b00000000, 0b000, 0b000) },
-      { 0x06, 0x00, cfgPrtUsb(0b000, 0b000) },
-      { 0x06, 0x00, cfgPrtSpi(0b00000000, 0b000, 0b000) },
+      { UbxId::CfgPrt, cfgPrtUart(2, 0b0000100011000000,   9600, 0b000, 0b000) },
+      { UbxId::CfgPrt, cfgPrtDdc(0b00000000, 0b000, 0b000) },
+      { UbxId::CfgPrt, cfgPrtUsb(0b000, 0b000) },
+      { UbxId::CfgPrt, cfgPrtSpi(0b00000000, 0b000, 0b000) },
       // cfg-msg
-      { 0x06, 0x01, {0x01, 0x02, 1}}, // NAV-POSLLH
-      { 0x06, 0x01, {0x01, 0x03, 1}}, // NAV-STATUS
-      { 0x06, 0x01, {0x01, 0x30, 4}}, // NAV-SVINFO
-      { 0x06, 0x01, {0x01, 0x21, 1}}, // NAV-TIMEUTC
+      { UbxId::CfgMsg, {UbxId::NavPosllh.clsId() , UbxId::NavPosllh.msgId() , 1}},
+      { UbxId::CfgMsg, {UbxId::NavStatus.clsId() , UbxId::NavStatus.msgId() , 1}}, // NAV-STATUS
+      { UbxId::CfgMsg, {UbxId::NavSvinfo.clsId() , UbxId::NavSvinfo.msgId() , 4}}, // NAV-SVINFO
+      { UbxId::CfgMsg, {UbxId::NavTimeUtc.clsId(), UbxId::NavTimeUtc.msgId(), 1}}, // NAV-TIMEUTC
     } ;
 
   usart.setup(9600) ;
@@ -352,7 +408,6 @@ void ubxSetup(LcdArea &la)
   if (baud != 115200)
   {
     la.clear() ; la.put("Setting to 115200") ;
-    UbxTx tx{ 0x06, 0x00, cfgPrtUart(1, 0b0000100011000000, 115200, 0b111, 0b001) } ;
     txCfgPrtUart1.send() ;
 
     if (!ubxTryBaud(115200))

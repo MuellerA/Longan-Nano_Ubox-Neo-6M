@@ -17,6 +17,34 @@ extern "C"
 
 ////////////////////////////////////////////////////////////////////////////////
 
+class UbxId
+{
+public:
+  static UbxId NavPosllh ;
+  static UbxId NavStatus ;
+  static UbxId NavTimeUtc ;
+  static UbxId NavSvinfo ;
+  
+  static UbxId AckAck ;
+
+  static UbxId CfgPrt ;
+  static UbxId CfgMsg ;
+
+  UbxId() ;
+  UbxId(uint8_t clsId, uint8_t msgId) ;
+  bool operator==(const UbxId&) const ;
+  uint8_t clsId() const ;
+  uint8_t msgId() const ;
+  uint8_t& clsId() ;
+  uint8_t& msgId() ;
+  
+private:
+  uint8_t _clsId ;
+  uint8_t _msgId ;
+} ;
+
+////////////////////////////////////////////////////////////////////////////////
+
 struct UbxAck
 {
   uint8_t clsId ;
@@ -105,20 +133,20 @@ struct UbxNavTimeUtc
 class UbxTx
 {
 public:
-  UbxTx(uint8_t clsId, uint8_t msgId, const std::vector<uint8_t>& data) ;
+  UbxTx(const UbxId &ubxId, const std::vector<uint8_t>& data) ;
   ~UbxTx() ;
 
   void send() const ;
 
-  uint8_t clsId() const { return _clsId ; }
-  uint8_t msgId() const { return _msgId ; }
+  const UbxId& ubxId() const { return _ubxId ; }
+  uint8_t clsId() const { return _ubxId.clsId() ; }
+  uint8_t msgId() const { return _ubxId.msgId() ; }
 
 private:
   void add(uint8_t b) ;
   void csum(uint8_t b) ;
 
-  uint8_t _clsId ;
-  uint8_t _msgId ;
+  UbxId _ubxId ;
   std::vector<uint8_t> _data ;
 
   uint8_t _chkA, _chkB ;
@@ -135,11 +163,11 @@ public:
   void reset() ;
   bool poll() ;
   bool valid() const ; // true if csum ok
-  bool is(uint8_t clsId, uint8_t msgId) const ;
-  bool is(uint8_t clsId, uint8_t msgId, uint16_t len) const ;
+  bool is(const UbxId &ubxId) const ;
+  bool is(const UbxId &ubxId, uint16_t len) const ;
 
-  uint8_t clsId() const { return _clsId ; }
-  uint8_t msgId() const { return _msgId ; }
+  uint8_t clsId() const { return _ubxId.clsId() ; }
+  uint8_t msgId() const { return _ubxId.msgId() ; }
   uint16_t len() const { return _len ; }
   const std::vector<uint8_t> data() const { return _data ; }
 
@@ -147,8 +175,7 @@ private:
   bool addUbx(uint8_t) ; // true if msg complete
   void csum(uint8_t b) ;
 
-  uint8_t _clsId ;
-  uint8_t _msgId ;
+  UbxId _ubxId ;
   uint16_t _len ;
   std::vector<uint8_t> _data ;
   uint8_t _idx ;
@@ -159,7 +186,8 @@ private:
 ////////////////////////////////////////////////////////////////////////////////
 
 bool navPosllh(const std::vector<uint8_t> &data, uint32_t &iTOW, int32_t &lon, int32_t &lat, int32_t &alt) ;
-bool navSvinfo(const std::vector<uint8_t> &data, uint32_t &iTOW, uint8_t &nChan) ;
+bool navSvinfo(const std::vector<uint8_t> &data, uint32_t &iTOW, uint8_t &nChan, std::vector<SvInfo> &svInfos) ;
+bool navSvinfoRep(const std::vector<uint8_t> &data, uint8_t index, uint8_t &chn, uint8_t &svid, uint8_t &flags, uint8_t &quality, uint8_t &cno) ;
 bool navStatus(const std::vector<uint8_t> &data, uint32_t &iTOW, uint8_t &gpsFix) ;
 bool navTimeUtc(const std::vector<uint8_t> &data, uint32_t &iTOW, uint16_t &year, uint8_t &month, uint8_t &day, uint8_t &hour, uint8_t &min, uint8_t &sec, uint8_t &valid) ;
 
