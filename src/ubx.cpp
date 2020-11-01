@@ -60,81 +60,103 @@ bool ack(const UbxId &ubxId, const std::vector<uint8_t> data)
   return (ubxId.clsId() == ubx->clsId) && (ubxId.msgId() == ubx->msgId) ;
 }
 
-bool navPosllh(const std::vector<uint8_t> &data, uint32_t &iTOW, int32_t &lon, int32_t &lat, int32_t &alt)
+////////////////////////////////////////////////////////////////////////////////
+
+UbxNav::UbxNav()
+{
+  _lastTow = ~0UL ;
+  _posllh.iTOW = ~0UL ;
+  _status.iTOW = ~0UL ;
+  _svinfo.iTOW = ~0UL ;
+  _timeUtc.iTOW = ~0UL ;
+}
+
+bool UbxNav::posllhValid()  const { return valid(_posllh .iTOW, 10000) ; }
+bool UbxNav::statusValid()  const { return valid(_status .iTOW, 10000) ; }
+bool UbxNav::svinfoValid()  const { return valid(_svinfo .iTOW, 10000) ; }
+bool UbxNav::timeUtcValid() const { return valid(_timeUtc.iTOW,  5000) ; }
+
+bool UbxNav::valid() const
+{
+  uint32_t tow = _lastTow ;
+  return valid(tow,  2000) ;
+}
+
+uint32_t UbxNav::lastTow() const { return _lastTow ; }
+
+const UbxNavPosllh& UbxNav::posllh() const { return _posllh ; }
+const UbxNavStatus& UbxNav::status() const { return _status ; }
+const UbxNavSvinfo& UbxNav::svinfo() const { return _svinfo ; }
+const std::vector<UbxNavSvinfoRep>& UbxNav::svinfoRep() const { return _svinfoRep ; }
+const UbxNavTimeUtc& UbxNav::timeUtc() const { return _timeUtc ; }
+
+bool UbxNav::posllh(const std::vector<uint8_t> &data)
 {
   if (data.size() < sizeof(UbxNavPosllh))
     return false ;
 
-  const UbxNavPosllh *ubx = (const UbxNavPosllh*) data.data() ;
-  iTOW = ubx->iTOW ;
-  lon = ubx->lon ;
-  lat = ubx->lat ;
-  alt = ubx->hMSL ;
+  _posllh = *(const UbxNavPosllh*) data.data() ;
+  tow(_posllh.iTOW) ;
   return true ;
 }
 
-bool navSvinfo(const std::vector<uint8_t> &data, uint32_t &iTOW, uint8_t &nChan, std::vector<SvInfo> &svInfos)
+bool UbxNav::svinfo(const std::vector<uint8_t> &data)
 {
   if (data.size() < sizeof(UbxNavSvinfo))
     return false ;
-
-  const UbxNavSvinfo *ubx = (const UbxNavSvinfo*) data.data() ;
-  iTOW = ubx->iTOW ;
-  nChan = ubx->numCh ;
-
-  uint8_t n = (nChan > 16) ? 16 : nChan ;
-  svInfos.resize(nChan) ;
-  for (uint8_t i = 0 ; i < n ; ++i)
-  {
-    uint8_t chn, svid, flags, quality, cno ;
-    if (navSvinfoRep(data, i, chn, svid, flags, quality, cno))
-      svInfos[i] = SvInfo{chn, svid, flags, quality, cno} ;
-  }  
-  
-  return true ;
-}
-
-bool navSvinfoRep(const std::vector<uint8_t> &data, uint8_t index, uint8_t &chn, uint8_t &svid, uint8_t &flags, uint8_t &quality, uint8_t &cno)
-{
-  if (data.size() < (sizeof(UbxNavSvinfo) + (index+1) * sizeof(UbxNavSvinfoRep)))
+  const UbxNavSvinfo *svinfo = (const UbxNavSvinfo*) data.data() ;
+  if (data.size() < (sizeof(UbxNavSvinfo) + svinfo->numCh * sizeof(UbxNavSvinfoRep)))
     return false ;
-
-  const UbxNavSvinfoRep *ubx = (const UbxNavSvinfoRep*) (data.data() + sizeof(UbxNavSvinfo) + index * sizeof(UbxNavSvinfoRep)) ;
-  chn = ubx->chn ;
-  svid = ubx->svid ;
-  flags = ubx->flags ;
-  quality = ubx->quality ;
-  cno = ubx->cno ;
+  
+  _svinfo = *(const UbxNavSvinfo*) data.data() ;
+  tow(_svinfo.iTOW) ;
+  _svinfoRep.clear() ;
+  _svinfoRep.reserve(_svinfo.numCh) ;
+  for (uint8_t iCh = 0 ; iCh < _svinfo.numCh ; ++iCh)
+    _svinfoRep.emplace_back(*(const UbxNavSvinfoRep*)(data.data() + sizeof(UbxNavSvinfo) + iCh * sizeof(UbxNavSvinfoRep))) ;
   return true ;
 }
 
-bool navStatus(const std::vector<uint8_t> &data, uint32_t &iTOW, uint8_t &gpsFix)
+bool UbxNav::status(const std::vector<uint8_t> &data)
 {
   if (data.size() < sizeof(UbxNavStatus))
     return false ;
 
-  const UbxNavStatus *ubx = (const UbxNavStatus*) data.data() ;
-  iTOW = ubx->iTOW ;
-  gpsFix = ubx->gpsFix ;
+  _status = *(const UbxNavStatus*) data.data() ;
+  tow(_status.iTOW) ;
   return true ;
 }
 
-bool navTimeUtc(const std::vector<uint8_t> &data, uint32_t &iTOW, uint16_t &year, uint8_t &month, uint8_t &day, uint8_t &hour, uint8_t &min, uint8_t &sec, uint8_t &valid)
+bool UbxNav::timeUtc(const std::vector<uint8_t> &data)
 {
   if (data.size() < sizeof(UbxNavTimeUtc))
     return false ;
 
-  const UbxNavTimeUtc *ubx = (const UbxNavTimeUtc*) data.data() ;
-  iTOW = ubx->iTOW ;
-  year = ubx->year ;
-  month = ubx->month ;
-  day = ubx->day ;
-  hour = ubx->hour ;
-  min = ubx->min ;
-  sec = ubx->sec ;
-  valid = ubx->valid ;
+  _timeUtc = *(const UbxNavTimeUtc*) data.data() ;
+  tow(_timeUtc.iTOW) ;
   return true ;
 }
+
+void UbxNav::tow(uint32_t tow)
+{
+  _lastTow = tow ;
+  _tickMsAtLastTow = TickTimer::tickToMs(TickTimer::now()) ;
+}
+
+bool UbxNav::valid(uint32_t &tow, uint32_t maxMs) const
+{
+  if (tow == ~0U)
+    return false ;
+  uint32_t nowMs = TickTimer::tickToMs(TickTimer::now()) ;
+
+  if (((_lastTow - tow) + (nowMs - _tickMsAtLastTow)) < maxMs)
+    return true ;
+
+  tow = ~0U ;
+  return false ;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 
 std::vector<uint8_t> cfgPrtUart(uint8_t portId, uint32_t mode, uint32_t baudRate, uint16_t inProtoMask, uint16_t outProtoMask)
 {
@@ -423,6 +445,7 @@ void ubxSetup(LcdArea &la)
     la.clear() ; la.put("Configuring") ;
     while (!ubxPoll(tx)) ;
   }
+  la.clear() ;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -11,6 +11,8 @@ extern "C"
 
 #include <vector>
 
+class LcdArea ;
+
 ////////////////////////////////////////////////////////////////////////////////
 
 #pragma pack(push,1)
@@ -70,6 +72,7 @@ struct UbxCfgPrtUart
 
 struct UbxNavPosllh
 {
+  mutable
   uint32_t iTOW ; // ms
   int32_t  lon ;  // deg
   int32_t  lat ;  // deg
@@ -81,6 +84,7 @@ struct UbxNavPosllh
 
 struct UbxNavStatus
 {
+  mutable
   uint32_t iTOW ;   // ms
   uint8_t  gpsFix ; // 0 no fix, 1 dead, 2 2d, 3 3d, 4 gps + dead, 5 time
   uint8_t  flags ;
@@ -92,6 +96,7 @@ struct UbxNavStatus
 
 struct UbxNavSvinfo
 {
+  mutable
   uint32_t iTOW ; // ms
   uint8_t  numCh ;
   uint8_t  globalFlags ;
@@ -112,6 +117,7 @@ struct UbxNavSvinfoRep
 
 struct UbxNavTimeUtc
 {
+  mutable
   uint32_t iTOW ;  // ms
   uint32_t tAcc ;  // ns
   int32_t  nano ;  // ns
@@ -122,6 +128,42 @@ struct UbxNavTimeUtc
   uint8_t  min ;   // m
   uint8_t  sec ;   // s
   uint8_t  valid ;
+} ;
+
+class UbxNav
+{
+public:
+  UbxNav() ;
+  
+  bool posllhValid() const ;
+  bool statusValid() const ;
+  bool svinfoValid() const ;
+  bool timeUtcValid() const ;
+  bool valid() const ;
+  uint32_t lastTow() const ;
+  const UbxNavPosllh& posllh() const ;
+  const UbxNavStatus& status() const ;
+  const UbxNavSvinfo& svinfo() const ;
+  const std::vector<UbxNavSvinfoRep>& svinfoRep() const ;
+  const UbxNavTimeUtc& timeUtc() const ;
+  
+  bool posllh(const std::vector<uint8_t> &data) ;
+  bool svinfo(const std::vector<uint8_t> &data) ;
+  bool status(const std::vector<uint8_t> &data) ;
+  bool timeUtc(const std::vector<uint8_t> &data) ;
+
+private:
+  void tow(uint32_t tow) ;
+  bool valid(uint32_t &tow, uint32_t maxMs = 5000) const ;
+
+  uint32_t     _lastTow ;
+  uint32_t     _tickMsAtLastTow ;
+  
+  UbxNavPosllh _posllh ;
+  UbxNavStatus _status ;
+  UbxNavSvinfo _svinfo ;
+  std::vector<UbxNavSvinfoRep> _svinfoRep ;
+  UbxNavTimeUtc _timeUtc ;
 } ;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -184,12 +226,6 @@ private:
 } ;
 
 ////////////////////////////////////////////////////////////////////////////////
-
-bool navPosllh(const std::vector<uint8_t> &data, uint32_t &iTOW, int32_t &lon, int32_t &lat, int32_t &alt) ;
-bool navSvinfo(const std::vector<uint8_t> &data, uint32_t &iTOW, uint8_t &nChan, std::vector<SvInfo> &svInfos) ;
-bool navSvinfoRep(const std::vector<uint8_t> &data, uint8_t index, uint8_t &chn, uint8_t &svid, uint8_t &flags, uint8_t &quality, uint8_t &cno) ;
-bool navStatus(const std::vector<uint8_t> &data, uint32_t &iTOW, uint8_t &gpsFix) ;
-bool navTimeUtc(const std::vector<uint8_t> &data, uint32_t &iTOW, uint16_t &year, uint8_t &month, uint8_t &day, uint8_t &hour, uint8_t &min, uint8_t &sec, uint8_t &valid) ;
 
 void ubxSetup(LcdArea &la) ;
 
