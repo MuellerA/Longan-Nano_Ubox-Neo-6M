@@ -146,6 +146,10 @@ public:
   const UbxNavSvinfo& svinfo() const ;
   const std::vector<UbxNavSvinfoRep>& svinfoRep() const ;
   const UbxNavTimeUtc& timeUtc() const ;
+  std::string timeUtcStr(bool compressed = false) const ;
+  std::string latStr() const ;
+  std::string lonStr() const ;
+  std::string altStr() const ;
   
   bool posllh(const std::vector<uint8_t> &data) ;
   bool svinfo(const std::vector<uint8_t> &data) ;

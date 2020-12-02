@@ -4,6 +4,7 @@
 
 #include "disp.h"
 #include "ubx.h"
+#include "file.h"
 #include "Longan/fatfs.h"
 #include "Longan/lcd.h"
 #include "GD32VF103/gpio.h"
@@ -17,15 +18,28 @@ GpioIrq &button(GpioIrq::gpioA8()) ;
 FatFs &fatfs{FatFs::fatfs()} ;
 extern Lcd &lcd ;
 
-bool ubxAscFound{false} ;
-bool buttonPressed{false} ;
+volatile bool ubxAscFound{false} ;
+volatile uint8_t buttonPressed{0} ; // 1 short, 2 long
 
 ////////////////////////////////////////////////////////////////////////////////
 
 void buttonIrqHdl(bool rising)
 {
+  static const uint64_t minTime{TickTimer::msToTick(5)} ;
+  static uint64_t lastChange{0} ;
+
+  uint64_t now = TickTimer::now() ;
+  uint64_t delta = now - lastChange ;
+
+  if (delta < minTime)
+    return ;
+
+  lastChange = now ;
+
   if (rising)
-    buttonPressed = true ;
+    return ;
+
+  buttonPressed = (delta < TickTimer::msToTick(500)) ? 1 : 2 ;
 }
 
 void getTimeUtc(const UbxNav &nav, FatFs::Time &time)
@@ -47,6 +61,15 @@ void getTimeUtc(const UbxNav &nav, FatFs::Time &time)
 
 ////////////////////////////////////////////////////////////////////////////////
 
+////////////////////////////////////////////////////////////////////////////////
+
+LcdArea *DbgArea ;
+void Dbg(char c)
+{
+  if (DbgArea)
+    DbgArea->put(c) ;
+}
+
 int main()
 {
   dispSetup() ;
@@ -56,7 +79,7 @@ int main()
     lcd.color(0xffffffUL, 0xa00000UL) ;
     lcd.clear() ;
     lcd.font(&::RV::Longan::Roboto_Bold7pt7b) ;
-    lcd.put("GPS RECEIVER 2.0", 80, 32) ;
+    lcd.put("GPS RECEIVER 2.0-pre", 80, 32) ;
     
     LcdArea laUbx(Lcd::lcd(), 0, 160, 64, 16) ;
     laUbx.clear() ;
@@ -68,24 +91,30 @@ int main()
   }
   
   LcdArea laData(Lcd::lcd(), 0, 150, 16, 64) ;
+  DbgArea = &laData ;
   
   button.setup(GpioIrq::Mode::IN_FL, buttonIrqHdl) ;
 
   UbxRx ubxRx ;
 
-  DispGpsFix dispGpsFix ;
-  DispSats   dispSats   ;
-  DispTow    dispTow    ;
-  DispSvInfo dispSvInfo ;
-  DispTime   dispTime   ;
-  DispPos    dispPos    ;
-  DispAscFound dispAscFound(1100) ;
+  DispGpsFix    dispGpsFix ;
+  DispSats      dispSats   ;
+  DispTow       dispTow    ;
+  DispSvInfo    dispSvInfo ;
+  DispTime      dispTime   ;
+  DispPos       dispPos    ;
+  DispFile      dispFile   ;
+  DispAscFound  dispAscFound(1100) ;
+  DispFileState dispFileState ;
   
   UbxNav ubxNav ;
 
   fatfs.setup([&ubxNav](FatFs::Time &time){ getTimeUtc(ubxNav, time) ; }) ;
+  File logging(ubxNav) ;
+
+  enum class Page { main, sat, file } ;
+  Page page{Page::main} ;
   
-  uint32_t page{0} ;
   bool force{true} ;
   uint8_t sched{0} ;
 
@@ -119,53 +148,86 @@ int main()
 
     switch (sched)
     {
-    case 0:
+    case 0: // handle button
       if (buttonPressed)
       {
-        static TickTimer t(500, (uint32_t)0) ; // ignore multi presses within 500ms
-        
-        buttonPressed = false ;
-      
-        if (t())
+        laData.clear() ;
+        switch (buttonPressed)
         {
-          t.restart() ;
-          laData.clear() ;
-          page = page ^ 0x01 ;
-
-          if (page == 0)
+        case 1:
+          switch (page)
+          {
+          case Page::main:
+            page = Page::sat ;
+            break ;
+          case Page::sat:
+          case Page::file:
+            page = Page::main ;
             dispPos.label() ;
-            
-          force = true ;
+            break ;
+          }
+          break ;
+        case 2:
+          switch (page)
+          {
+          case Page::main:
+          case Page::sat:
+            page = Page::file ;
+            break ;
+          case Page::file:
+            if (logging.state() == File::State::closed)
+            {
+              if (fatfs.mount() == RV::Longan::FF::FR_OK)
+                logging.open() ;
+            }
+            else
+            {
+              logging.close() ;
+              fatfs.unmount() ;
+            }
+            break ;
+          }
+          break ;
         }
+        force = true ;
+        buttonPressed = 0 ;
       }
       break ;
-    case 1:
+    case 1: // update display
       {
-        dispGpsFix  .display(ubxNav, force) ;
-        dispSats    .display(ubxNav, force) ;
-        dispTow     .display(ubxNav, force) ;
+        dispGpsFix  .display(ubxNav, false) ;
+        dispSats    .display(ubxNav, false) ;
+        dispTow     .display(ubxNav, false) ;
+        dispFile    .display(ubxNav, logging, false) ;
 
         switch (page)
         {
-        case 0:
+        case Page::main:
           dispTime    .display(ubxNav, force) ;
           dispPos     .display(ubxNav, force) ;
           dispAscFound.display(force) ;
           break ;
-        case 1:
+        case Page::sat:
           dispSvInfo  .display(ubxNav, force) ;
           break ;
-        case 2:
+        case Page::file:
+          if (force)
+          {
+            laData.txtPos(0) ; laData.put("press long to") ;
+            laData.txtPos(1) ; laData.put("start/stop logging") ;
+          }
+          dispFileState.display(logging, force) ;
           break ;
         }
 
         force = false ;
       }
       break ;
-    case 2:
+    case 2: // update sd card
       {
-        // fatfs
+        logging.loop() ;
       }
+      break ;
     }
     sched = (sched + 1) % 3 ;
   }

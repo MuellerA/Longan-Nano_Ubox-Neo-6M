@@ -7,6 +7,7 @@
 
 #include "GD32VF103/time.h"
 #include "GD32VF103/usart.h"
+#include "Longan/toStr.h"
 
 using ::RV::GD32VF103::TickTimer ;
 using ::RV::GD32VF103::Usart ;
@@ -89,6 +90,75 @@ const UbxNavStatus& UbxNav::status() const { return _status ; }
 const UbxNavSvinfo& UbxNav::svinfo() const { return _svinfo ; }
 const std::vector<UbxNavSvinfoRep>& UbxNav::svinfoRep() const { return _svinfoRep ; }
 const UbxNavTimeUtc& UbxNav::timeUtc() const { return _timeUtc ; }
+
+std::string UbxNav::timeUtcStr(bool compressed) const
+{
+  if (compressed)
+  {
+    //  0123456789012345678
+    // "xxxxxxxx xxxxxx"
+    char text[15] ;
+    RV::toStr(_timeUtc.year , text+ 0, 4, '0') ;
+    RV::toStr(_timeUtc.month, text+ 4, 2, '0') ;
+    RV::toStr(_timeUtc.day  , text+ 6, 2, '0') ; text[8] = ' ' ;
+    RV::toStr(_timeUtc.hour , text+ 9, 2, '0') ;
+    RV::toStr(_timeUtc.min  , text+11, 2, '0') ;
+    RV::toStr(_timeUtc.sec  , text+13, 2, '0') ;
+    return std::string(text, 15) ;
+  }
+  else
+  {
+    //  0123456789012345678
+    // "xxxx-xx-xx xx:xx:xx"
+    char text[19] ;
+    RV::toStr(_timeUtc.year , text+ 0, 4, '0') ; text[ 4] = '-' ;
+    RV::toStr(_timeUtc.month, text+ 5, 2, '0') ; text[ 7] = '-' ;
+    RV::toStr(_timeUtc.day  , text+ 8, 2, '0') ; text[10] = ' ' ;
+    RV::toStr(_timeUtc.hour , text+11, 2, '0') ; text[13] = ':' ;
+    RV::toStr(_timeUtc.min  , text+14, 2, '0') ; text[16] = ':' ;
+    RV::toStr(_timeUtc.sec  , text+17, 2, '0') ;
+    return std::string(text, 19) ;
+  }
+}
+
+std::string UbxNav::latStr() const
+{
+  int32_t lat = _posllh.lat / 1000 ;
+  int32_t g = lat / 10000 ;
+  int32_t t = lat - g * 10000 ;
+  if (t < 0) t = -t ;
+  char text[32] ;
+  char *start = RV::toStr(g, text, 16) ;
+  text[16] = '.' ;
+  RV::toStr(t, text+17, 4, '0') ;
+  return std::string(start, 16 - (start-text) + 5) ;
+}
+
+std::string UbxNav::lonStr() const
+{
+  int32_t lon = _posllh.lon / 1000 ;
+  int32_t g = lon / 10000 ;
+  int32_t t = lon - g * 10000 ;
+  if (t < 0) t = -t ;
+  char text[32] ;
+  char *start = RV::toStr(g, text, 16) ;
+  text[16] = '.' ;
+  RV::toStr(t, text+17, 4, '0') ;
+  return std::string(start, 16 - (start-text) + 5) ;
+}
+
+std::string UbxNav::altStr() const
+{
+  int32_t alt = _posllh.alt / 100 ;
+  int32_t g = alt / 10 ;
+  int32_t t = alt - g * 10 ;
+  if (t < 0) t = -t ;
+  char text[32] ;
+  char *start = RV::toStr(g, text, 16) ;
+  text[16] = '.' ;
+  RV::toStr(t, text+17, 1, '0') ;
+  return std::string(start, 16 - (start-text) + 2) ;
+}
 
 bool UbxNav::posllh(const std::vector<uint8_t> &data)
 {

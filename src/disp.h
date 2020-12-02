@@ -18,15 +18,16 @@ using ::RV::Longan::Lcd ;
 using ::RV::Longan::LcdArea ;
 
 class UbxNav ;
+class File ;
 
 //////////////////////////////////////////////////////////////////////////
-//  title 0, 110             | fix 115, 20 | sats 135, 20  | tow 155, 5 //
+//  title 0, 110        | fix 115, 20 | sats 135, 20  | tow,file 155, 5 //
 //  time 0, 160                                                         //
 //  lat lbl 0, 40     | lat val 40, 100                                 //
 //  lon lbl 0, 40     | lon val 40, 100                                 //
 //  alt lbl 0, 40     | alt val 40, 100                  | asc 150,10   //
 //////////////////////////////////////////////////////////////////////////
-//  title 0, 110             | fix 115, 20 | sats 135, 20  | tow 155, 5 //
+//  title 0, 110        | fix 115, 20 | sats 135, 20  | tow,file 155, 5 //
 //  data 0, 150                                                         //
 //  data 0, 150                                                         //
 //  data 0, 150                                                         //
@@ -94,6 +95,28 @@ public:
 private:
   LcdArea   _la ;
   uint32_t  _iTOW ;
+  bool      _toggle ;
+  TickTimer _t ;
+} ;
+
+class DispFile
+{
+public:
+  DispFile() ;
+  void display(const UbxNav &nav, const File &file, bool force=false) ;
+private:
+  LcdArea _la ;
+  uint32_t _state ;    
+} ;
+
+class DispFileState
+{
+public:
+  DispFileState() ;
+  void display(const File &file, bool force=false) ;
+private:
+  LcdArea _la ;
+  uint32_t _state ;
 } ;
 
 class DispAscFound

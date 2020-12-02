@@ -4,6 +4,7 @@
 
 #include "disp.h"
 #include "ubx.h"
+#include "file.h"
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -27,17 +28,8 @@ void DispTime::display(const UbxNav &nav, bool force)
     {
       _iTOW = timeUtc.iTOW ;
       _la.txtPos(0) ;
-      _la.put(timeUtc.year, 4, '0') ;
-      _la.put('-') ;
-      _la.put(timeUtc.month, 2, '0') ;
-      _la.put('-') ;
-      _la.put(timeUtc.day, 2, '0') ;
-      _la.put(' ') ;
-      _la.put(timeUtc.hour, 2, '0') ;
-      _la.put(':') ;
-      _la.put(timeUtc.min, 2, '0') ;
-      _la.put(':') ;
-      _la.put(timeUtc.sec, 2, '0') ;
+      std::string time = nav.timeUtcStr() ;
+      _la.put(time.data(), time.size()) ;
       _la.clearEOL() ;
     }
   }
@@ -86,37 +78,22 @@ void DispPos::display(const UbxNav &nav, bool force)
     {
       _iTOW = posllh.iTOW ;
       {
-        uint32_t lat = posllh.lat / 1000 ;
-        int32_t g = lat / 10000 ;
-        int32_t t = lat - g*10000 ;
-        if (t < 0) t = -t ;
+        std::string lat = nav.latStr() ;
         _laLat.txtPos(0) ;
-        _laLat.put(g) ;
-        _laLat.put('.') ;
-        _laLat.put(t, 4, '0') ;
+        _laLat.put(lat.data(), lat.size()) ;
         _laLat.clearEOL() ;
       }
       {
-        uint32_t lon = posllh.lon / 1000 ;
-        int32_t g = lon / 10000 ;
-        int32_t t = lon - g*10000 ;
-        if (t < 0) t = -t ;
+        std::string lon = nav.lonStr() ;
         _laLon.txtPos(0) ;
-        _laLon.put(g) ;
-        _laLon.put('.') ;
-        _laLon.put(t, 4, '0') ;
+        _laLon.put(lon.data(), lon.size()) ;
         _laLon.clearEOL() ;
       }
       if (fix == 3)
       {
-        uint32_t alt = posllh.alt / 100 ;
-        int32_t g = alt / 10 ;
-        int32_t t = alt - g*10 ;
-        if (t < 0) t = -t ;
+        std::string alt = nav.altStr() ;
         _laAlt.txtPos(0) ;
-        _laAlt.put(g) ;
-        _laAlt.put('.') ;
-        _laAlt.put(t) ;
+        _laAlt.put(alt.data(), alt.size()) ;
         _laAlt.clearEOL() ;
       }
       else
@@ -281,7 +258,7 @@ void DispSvInfo::display(const UbxNav &nav, bool force)
 ////////////////////////////////////////////////////////////////////////////////
 
 DispTow::DispTow() :
-  _la(lcd), _iTOW{~0UL}
+  _la(lcd), _iTOW{~0UL}, _toggle{false}, _t(1000)
 {
   _la.area(155, 5, 0, 5) ;
   _la.clear() ;
@@ -291,10 +268,14 @@ void DispTow::display(const UbxNav &nav, bool force)
 {
   if (nav.valid())
   {
-    if (((_iTOW & 0xfffffc00) != (nav.lastTow() & 0xfffffc00)) || force)
+    if (_t() || force)
     {
       _iTOW = nav.lastTow() ;
-      _la.clear((nav.lastTow() & 1<<10) ? 0x00ff00 : 0x000000) ;
+      if (force)
+        _toggle = true ;
+      _t.restart() ;
+      _la.clear(_toggle ? 0x00ff00 : 0x000000) ;
+      _toggle = !_toggle ;
     }
   }
   else
@@ -304,6 +285,60 @@ void DispTow::display(const UbxNav &nav, bool force)
       _iTOW = ~0UL ;
       _la.clear(0xff0000) ;
     }
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+DispFile::DispFile() :
+  _la(lcd), _state(~0UL)
+{
+  _la.area(155, 5, 10, 5) ;
+  _la.clear() ;
+}
+
+void DispFile::display(const UbxNav &nav, const File &file, bool force)
+{
+  File::State state = file.state() ;
+  
+  if ((_state != (uint32_t) state) || force)
+  {
+    _state = (uint32_t) state ;
+    switch (state)
+    {
+    case File::State::closed:  _la.clear(0xff0000) ; break ;
+    case File::State::pending: _la.clear(0xe2b007) ; break ;
+    case File::State::open:    _la.clear(0xe2b007) ; break ;
+    case File::State::writing: _la.clear(0x00ff00) ; break ;
+    }
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+DispFileState::DispFileState() :
+  _la(lcd), _state(~0UL)
+{
+  _la.area(0, 160, 48, 16) ;
+  _la.clear() ;
+}
+
+void DispFileState::display(const File &file, bool force)
+{
+  File::State state = file.state() ;
+  
+  if ((_state != (uint32_t) state) || force)
+  {
+    _state = (uint32_t) state ;
+    _la.txtPos(0) ;
+    switch (state)
+    {
+    case File::State::closed:  _la.put("not logging")          ; break ;
+    case File::State::pending: _la.put("waiting for UTC time") ; break ;
+    case File::State::open:    _la.put("waiting for GPS fix")  ; break ;
+    case File::State::writing: _la.put("logging")              ; break ;
+    }
+    _la.clearEOL() ;
   }
 }
 
