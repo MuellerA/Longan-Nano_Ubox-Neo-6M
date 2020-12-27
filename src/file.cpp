@@ -2,11 +2,12 @@
 // file.cpp
 ////////////////////////////////////////////////////////////////////////////////
 
+#include "Longan/toStr.h"
 #include "file.h"
 #include "ubx.h"
 
-File::File(const UbxNav &nav) :
-  _nav{nav}, _state{File::State::closed}, _timer(5000, true)
+File::File(RV::Longan::FatFs &fatfs, const UbxNav &nav) :
+  _fatfs{fatfs}, _nav{nav}, _state{File::State::closed}, _timer(5000, true)
 {
   _queue.reserve(_QueueSize + 128) ;
 }
@@ -18,11 +19,8 @@ bool File::open()
   return true ;
 }
 
-void Dbg(char c) ;
-
 bool File::close()
 {
-  Dbg('D') ;
   switch (_state)
   {
   case State::pending:
@@ -73,18 +71,19 @@ File::State File::open0()
   if (!_nav.timeUtcValid() || !(_nav.timeUtc().valid & 0b100))
     return State::pending ;
   std::string name = _nav.timeUtcStr(true) + ".csv" ;
-  if (_file.open(name.c_str(), FA_CREATE_ALWAYS | FA_WRITE) != RV::Longan::FF::FR_OK)
-  {
+  if (_fatfs.mount() != RV::Longan::FF::FR_OK)
     return State::closed ;
-  }
+  if (_file.open(name.c_str(), FA_CREATE_ALWAYS | FA_WRITE) != RV::Longan::FF::FR_OK)
+    return State::closed ;
   
-  _queue = "utc_d,utc_t,lat,lon,alt\n" ;
+  _queue = "utc_d,utc_t,lat,lon,alt,sat\n" ;
   return State::open ;
 }
 
 File::State File::close0()
 {
   _file.close() ;
+  _fatfs.unmount() ;
   _queue.clear() ;
   return State::closed ;
 }
@@ -102,6 +101,8 @@ File::State File::write0()
   if (!_nav.posllhValid() || !fix)
     return State::open ;
   std::string str = _nav.timeUtcStr() ;
+
+  char buff[16] ;
   str[10] = ',' ;
   _queue += str ;
   _queue += ',' ;
@@ -111,15 +112,16 @@ File::State File::write0()
   _queue += ',' ;
   if (fix == 3)
     _queue += _nav.altStr() ;
+  _queue += ',' ;
+  _queue += RV::toStr(_nav.sats(), buff, sizeof(buff)) ;
   _queue += '\n' ;
   
   if (_queue.size() >= _QueueSize)
   {
     size_t size = _QueueSize ;
     if (_file.write(_queue.data(), size) != RV::Longan::FF::FR_OK)
-    {
       return close0() ;
-    }
+
     _queue.erase(0, _QueueSize) ;
   }
   return State::writing ;

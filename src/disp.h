@@ -103,7 +103,7 @@ class DispFile
 {
 public:
   DispFile() ;
-  void display(const UbxNav &nav, const File &file, bool force=false) ;
+  void display(const File &file, bool force=false) ;
 private:
   LcdArea _la ;
   uint32_t _state ;    

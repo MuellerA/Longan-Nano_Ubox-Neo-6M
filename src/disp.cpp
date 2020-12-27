@@ -164,13 +164,8 @@ void DispSats::display(const UbxNav &nav, bool force)
     {
       _iTOW = svinfo.iTOW ;
 
-      uint32_t sat = 0 ;
-      for (const UbxNavSvinfoRep &svInfoRep : nav.svinfoRep())
-        if (svInfoRep.flags & 1)
-          sat += 1 ;
-      
       _la.txtPos(0) ;
-      _la.put(sat) ;
+      _la.put(nav.sats()) ;
       _la.clearEOL() ;
     }
   }
@@ -297,7 +292,7 @@ DispFile::DispFile() :
   _la.clear() ;
 }
 
-void DispFile::display(const UbxNav &nav, const File &file, bool force)
+void DispFile::display(const File &file, bool force)
 {
   File::State state = file.state() ;
   

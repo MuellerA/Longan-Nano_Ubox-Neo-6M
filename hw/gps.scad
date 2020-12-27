@@ -165,6 +165,9 @@ module Antenna()
   
 module bottom()
 {
+  sdcardX =  7 ;
+  sdcardY = 12 ;
+  
   height = zBottom ;
 
   difference()
@@ -173,6 +176,9 @@ module bottom()
     {
       base(height) ;
 
+      // sdcard
+      translate([(-length+sdcardX)/2, 0, height/2])
+      cube([sdcardX+2*wallWidth, sdcardY+2*wallWidth, height], center=true) ;
       translate([xOffsetGps    , 0, 0]) PcbUbloxNeo6Mblue() ;
       translate([xOffsetAntenna, 0, 0]) Antenna() ;
     }
@@ -180,8 +186,11 @@ module bottom()
     union()
     {
       // sdcard
-      translate([-length/2, 0, height/2])
-        cube([14, 12, height*2], center=true) ;
+      translate([(-length+sdcardX)/2-wallWidth, 0, height/2])
+      cube([sdcardX+2*wallWidth, sdcardY, height*2], center=true) ;
+
+      translate([-length/2+sdcardX+wallWidth/2, 0, height])
+        cube([2*wallWidth, sdcardY, 2], center=true) ;
     }
   }
 

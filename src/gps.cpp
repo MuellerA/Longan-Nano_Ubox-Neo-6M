@@ -14,32 +14,48 @@ using ::RV::GD32VF103::GpioIrq ;
 using ::RV::Longan::FatFs ;
 using ::RV::Longan::Lcd ;
 
-GpioIrq &button(GpioIrq::gpioA8()) ;
+Gpio &button(Gpio::gpioA8()) ;
 FatFs &fatfs{FatFs::fatfs()} ;
 extern Lcd &lcd ;
 
 volatile bool ubxAscFound{false} ;
-volatile uint8_t buttonPressed{0} ; // 1 short, 2 long
 
 ////////////////////////////////////////////////////////////////////////////////
 
-void buttonIrqHdl(bool rising)
+int _put_char(int ch) // used by printf
 {
-  static const uint64_t minTime{TickTimer::msToTick(5)} ;
-  static uint64_t lastChange{0} ;
+  lcd.put((char)ch) ;
+  return ch ;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+uint8_t buttonPressed()
+{
+  struct State
+  {
+    State() : _value{0x00}, _tick{TickTimer::now()} {}
+    uint8_t  _value ;
+    uint64_t _tick ;
+  } ;
+  static State last ;
+  static State current ;
 
   uint64_t now = TickTimer::now() ;
-  uint64_t delta = now - lastChange ;
+  if ((now - current._tick) < TickTimer::usToTick(2500))
+    return 0 ;
 
-  if (delta < minTime)
-    return ;
+  current._tick = now ;
+  current._value = (current._value << 1) | button.get() ;
+  if ((current._value == last._value) ||
+      ((current._value != 0x00) && (current._value != 0xff)))
+    return 0 ;
 
-  lastChange = now ;
-
-  if (rising)
-    return ;
-
-  buttonPressed = (delta < TickTimer::msToTick(500)) ? 1 : 2 ;
+  uint32_t ms = TickTimer::tickToMs(current._tick - last._tick) ;
+  last = current ;
+  if (current._value)
+    return 0 ;
+  return (ms < 600) ? 1 : 2 ;
 }
 
 void getTimeUtc(const UbxNav &nav, FatFs::Time &time)
@@ -61,15 +77,6 @@ void getTimeUtc(const UbxNav &nav, FatFs::Time &time)
 
 ////////////////////////////////////////////////////////////////////////////////
 
-////////////////////////////////////////////////////////////////////////////////
-
-LcdArea *DbgArea ;
-void Dbg(char c)
-{
-  if (DbgArea)
-    DbgArea->put(c) ;
-}
-
 int main()
 {
   dispSetup() ;
@@ -79,7 +86,7 @@ int main()
     lcd.color(0xffffffUL, 0xa00000UL) ;
     lcd.clear() ;
     lcd.font(&::RV::Longan::Roboto_Bold7pt7b) ;
-    lcd.put("GPS RECEIVER 2.0-pre", 80, 32) ;
+    lcd.put("GPS RECEIVER 2.0-beta", 80, 32) ;
     
     LcdArea laUbx(Lcd::lcd(), 0, 160, 64, 16) ;
     laUbx.clear() ;
@@ -91,9 +98,8 @@ int main()
   }
   
   LcdArea laData(Lcd::lcd(), 0, 150, 16, 64) ;
-  DbgArea = &laData ;
   
-  button.setup(GpioIrq::Mode::IN_FL, buttonIrqHdl) ;
+  button.setup(Gpio::Mode::IN_FL) ;
 
   UbxRx ubxRx ;
 
@@ -110,7 +116,7 @@ int main()
   UbxNav ubxNav ;
 
   fatfs.setup([&ubxNav](FatFs::Time &time){ getTimeUtc(ubxNav, time) ; }) ;
-  File logging(ubxNav) ;
+  File logging(fatfs, ubxNav) ;
 
   enum class Page { main, sat, file } ;
   Page page{Page::main} ;
@@ -149,12 +155,12 @@ int main()
     switch (sched)
     {
     case 0: // handle button
-      if (buttonPressed)
+      switch (buttonPressed())
       {
-        laData.clear() ;
-        switch (buttonPressed)
+      case 1: // short
         {
-        case 1:
+          laData.clear() ;
+          force = true ;
           switch (page)
           {
           case Page::main:
@@ -166,31 +172,27 @@ int main()
             dispPos.label() ;
             break ;
           }
-          break ;
-        case 2:
+        }
+        break ;
+      case 2: // long
+        {
           switch (page)
           {
           case Page::main:
           case Page::sat:
+            laData.clear() ;
+            force = true ;
             page = Page::file ;
             break ;
           case Page::file:
             if (logging.state() == File::State::closed)
-            {
-              if (fatfs.mount() == RV::Longan::FF::FR_OK)
-                logging.open() ;
-            }
+              logging.open() ;
             else
-            {
               logging.close() ;
-              fatfs.unmount() ;
-            }
             break ;
           }
-          break ;
         }
-        force = true ;
-        buttonPressed = 0 ;
+        break ;
       }
       break ;
     case 1: // update display
@@ -198,7 +200,7 @@ int main()
         dispGpsFix  .display(ubxNav, false) ;
         dispSats    .display(ubxNav, false) ;
         dispTow     .display(ubxNav, false) ;
-        dispFile    .display(ubxNav, logging, false) ;
+        dispFile    .display(logging, false) ;
 
         switch (page)
         {

@@ -25,7 +25,7 @@ public:
       writing  // got fix
     } ;
   
-  File(const UbxNav &nav) ;
+  File(RV::Longan::FatFs &fatfs, const UbxNav &nav) ;
   bool open() ;
   bool close() ;
   void loop() ;
@@ -37,6 +37,7 @@ private:
   State close0() ;
   static const uint32_t _QueueSize = 512 ;
   
+  RV::Longan::FatFs &_fatfs ;
   const UbxNav &_nav ;
   State _state ;
   std::string _queue ; // write every 512 bytes

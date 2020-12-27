@@ -14,7 +14,11 @@ using ::RV::GD32VF103::Usart ;
 
 ////////////////////////////////////////////////////////////////////////////////
 
-Usart& usart(Usart::usart0()) ;
+#ifdef USART_GPS
+Usart& usart(Usart::USART_GPS()) ;
+#else
+#error "undefined USART (-D USART_GPS=usartN)"
+#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -123,28 +127,28 @@ std::string UbxNav::timeUtcStr(bool compressed) const
 
 std::string UbxNav::latStr() const
 {
-  int32_t lat = _posllh.lat / 1000 ;
-  int32_t g = lat / 10000 ;
-  int32_t t = lat - g * 10000 ;
+  int32_t lat = _posllh.lat / 100 ;
+  int32_t g = lat / 100000 ;
+  int32_t t = lat - g * 100000 ;
   if (t < 0) t = -t ;
   char text[32] ;
   char *start = RV::toStr(g, text, 16) ;
   text[16] = '.' ;
-  RV::toStr(t, text+17, 4, '0') ;
-  return std::string(start, 16 - (start-text) + 5) ;
+  RV::toStr(t, text+17, 5, '0') ;
+  return std::string(start, 16 - (start-text) + 6) ;
 }
 
 std::string UbxNav::lonStr() const
 {
-  int32_t lon = _posllh.lon / 1000 ;
-  int32_t g = lon / 10000 ;
-  int32_t t = lon - g * 10000 ;
+  int32_t lon = _posllh.lon / 100 ;
+  int32_t g = lon / 100000 ;
+  int32_t t = lon - g * 100000 ;
   if (t < 0) t = -t ;
   char text[32] ;
   char *start = RV::toStr(g, text, 16) ;
   text[16] = '.' ;
-  RV::toStr(t, text+17, 4, '0') ;
-  return std::string(start, 16 - (start-text) + 5) ;
+  RV::toStr(t, text+17, 5, '0') ;
+  return std::string(start, 16 - (start-text) + 6) ;
 }
 
 std::string UbxNav::altStr() const
@@ -158,6 +162,18 @@ std::string UbxNav::altStr() const
   text[16] = '.' ;
   RV::toStr(t, text+17, 1, '0') ;
   return std::string(start, 16 - (start-text) + 2) ;
+}
+
+uint8_t UbxNav::sats() const
+{
+  if (!svinfoValid())
+    return 0 ;
+  
+  uint32_t sat{0} ;
+  for (const UbxNavSvinfoRep &svInfoRep : _svinfoRep)
+    if (svInfoRep.flags & 1)
+      sat += 1 ;
+  return sat ;  
 }
 
 bool UbxNav::posllh(const std::vector<uint8_t> &data)
@@ -487,7 +503,7 @@ void ubxSetup(LcdArea &la)
       // cfg-msg
       { UbxId::CfgMsg, {UbxId::NavPosllh.clsId() , UbxId::NavPosllh.msgId() , 1}},
       { UbxId::CfgMsg, {UbxId::NavStatus.clsId() , UbxId::NavStatus.msgId() , 1}}, // NAV-STATUS
-      { UbxId::CfgMsg, {UbxId::NavSvinfo.clsId() , UbxId::NavSvinfo.msgId() , 4}}, // NAV-SVINFO
+      { UbxId::CfgMsg, {UbxId::NavSvinfo.clsId() , UbxId::NavSvinfo.msgId() , 1}}, // NAV-SVINFO
       { UbxId::CfgMsg, {UbxId::NavTimeUtc.clsId(), UbxId::NavTimeUtc.msgId(), 1}}, // NAV-TIMEUTC
     } ;
 

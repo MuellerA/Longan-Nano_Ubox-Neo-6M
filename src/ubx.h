@@ -150,6 +150,7 @@ public:
   std::string latStr() const ;
   std::string lonStr() const ;
   std::string altStr() const ;
+  uint8_t sats() const ;
   
   bool posllh(const std::vector<uint8_t> &data) ;
   bool svinfo(const std::vector<uint8_t> &data) ;
