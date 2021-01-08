@@ -328,10 +328,10 @@ void DispFileState::display(const File &file, bool force)
     _la.txtPos(0) ;
     switch (state)
     {
-    case File::State::closed:  _la.put("not logging")          ; break ;
+    case File::State::closed:  _la.put("logging off")          ; break ;
     case File::State::pending: _la.put("waiting for UTC time") ; break ;
     case File::State::open:    _la.put("waiting for GPS fix")  ; break ;
-    case File::State::writing: _la.put("logging")              ; break ;
+    case File::State::writing: _la.put("logging data")         ; break ;
     }
     _la.clearEOL() ;
   }

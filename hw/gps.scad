@@ -110,7 +110,10 @@ module top()
       
         // button
         bd = buttonD + 2 * 0.4 ;
-        translate([-buttonLoffset, buttonWoffset, 1/2]) cylinder(d=bd+2*wallWidth, h=1, center=true) ;
+        translate([-buttonLoffset, buttonWoffset, 0.51]) cylinder(d=bd+2*wallWidth, h=1, center=true) ;
+
+        // reset
+        translate([-buttonLoffset, -buttonWoffset, 0.51]) cylinder(d=bd+2*wallWidth, h=1, center=true) ;
       }
       
       translate([xOffsetAntenna, 0, 0]) Antenna() ;
@@ -126,7 +129,10 @@ module top()
         // button
         bd = buttonD + 2 * 0.4 ;
         translate([-buttonLoffset, buttonWoffset, 0]) cylinder(d=bd, h=10, center=true) ;
-      
+
+        // reset
+        translate([-buttonLoffset, -buttonWoffset, 0]) cylinder(d=2, h=10, center=true) ;
+        
         // usb
         translate([-length/2+17, 0, usbHeight/2+usbOffset])
           cube([10, usbWidth, usbHeight], center=true) ;

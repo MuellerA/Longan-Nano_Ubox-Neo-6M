@@ -10,7 +10,6 @@
 #include "GD32VF103/gpio.h"
 
 using ::RV::GD32VF103::Gpio ;
-using ::RV::GD32VF103::GpioIrq ;
 using ::RV::Longan::FatFs ;
 using ::RV::Longan::Lcd ;
 
@@ -79,28 +78,33 @@ void getTimeUtc(const UbxNav &nav, FatFs::Time &time)
 
 int main()
 {
+  button.setup(Gpio::Mode::IN_FL) ;
+
   dispSetup() ;
   {
-    TickTimer t(1500) ;
-    
     lcd.color(0xffffffUL, 0xa00000UL) ;
     lcd.clear() ;
+    lcd.put("https://git.io/JLHU1", 80, 48) ;
     lcd.font(&::RV::Longan::Roboto_Bold7pt7b) ;
-    lcd.put("GPS RECEIVER 2.0-beta", 80, 32) ;
+    lcd.put("GPS RECEIVER 2.0", 80, 24) ;
     
     LcdArea laUbx(Lcd::lcd(), 0, 160, 64, 16) ;
     laUbx.clear() ;
     ubxSetup(laUbx) ;
 
-    while (!t()) ;
+    TickTimer t(1250) ;
+    bool bp = false ;
+    while (!t())
+      bp |= buttonPressed() ;
+    if (bp)
+      while (!buttonPressed()) ;
+    
     lcd.clear(0x000000UL) ;
     lcd.put("   GPS RECEIVER   ") ;
   }
   
   LcdArea laData(Lcd::lcd(), 0, 150, 16, 64) ;
   
-  button.setup(Gpio::Mode::IN_FL) ;
-
   UbxRx ubxRx ;
 
   DispGpsFix    dispGpsFix ;
