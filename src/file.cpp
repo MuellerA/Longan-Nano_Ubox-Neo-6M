@@ -71,6 +71,7 @@ File::State File::open0()
   if (!_nav.timeUtcValid() || !(_nav.timeUtc().valid & 0b100))
     return State::pending ;
   std::string name = _nav.timeUtcStr(true) + ".csv" ;
+  name[8] = '-' ;
   if (_fatfs.mount() != RV::Longan::FF::FR_OK)
     return State::closed ;
   if (_file.open(name.c_str(), FA_CREATE_ALWAYS | FA_WRITE) != RV::Longan::FF::FR_OK)

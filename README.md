@@ -16,16 +16,14 @@ The top line of all screens show
 
 ## Logging
 
-The logging will start when the UTC time and GPS position are found. The file name will be the start UTC time with the extension csv.
+The logging will start when the UTC time and GPS position are found and will then be update every five seconds. The file name will be the start UTC time with the extension csv.
 Always stop logging before power off, else data will be lost and the file system might get corrupted.
 
-The logfile format is compatible with [GPSBabel](http://www.gpsbabel.org/index.html)'s [unicsv](http://www.gpsbabel.org/htmldoc-1.7.0/fmt_unicsv.html) format. GPSBabel can convert the logfile to many different formats (try ```gpsbabel -h``` for a full list of formats). E.g. to create a Google Earth kml file use the command:
+The logfile format is compatible with [GPSBabel](http://www.gpsbabel.org/index.html)'s [unicsv](http://www.gpsbabel.org/htmldoc-1.7.0/fmt_unicsv.html) format. GPSBabel can convert the logfile to many different formats (try ```gpsbabel -h``` for a full list of formats). E.g. to create a kml file for Google Earth use the command:
 
 ```
 gpsbabel -i unicsv -f 'yyymmdd hhmmss.csv' -o kml -F 'yyymmdd hhmmss.kml'
 ```
-
-todo: example
 
 ## Compilation
 
@@ -38,6 +36,10 @@ pio run -e usart0 -t upload
 
 ## 3D Print STL files
 
-<img src="img11.jpg" alt="" height="200px"/> <img src="img12.jpg" alt="" height="200px"/> todo: img offen, img fertig
+<img src="img10.png" alt="" height="200px"/> 
+<img src="img11.jpg" alt="" height="200px"/> 
+<img src="img12.jpg" alt="" height="200px"/> 
+<img src="img13.jpg" alt="" height="200px"/> 
+<img src="img14.jpg" alt="" height="200px"/> 
 
-In the hw/ folder are STL files for a housing for the 35.8mm x 26.5mm board and the square 24mm x 24mm antenna. The source OpenSCAD file is included as well.
+The [OpenSCAD](http://www.openscad.org/downloads.html) file ```hw/gps.scad``` can be used to create STL files for a 3D printed housing. The dimensions of the GPS board and antenna can be changed using the Customizer: In menu *View* uncheck *Hide Customizer*, in the Customizer dialog modify the parameters, press *F6* and then *F7* to create the STL files. When printing the button might need a brim.

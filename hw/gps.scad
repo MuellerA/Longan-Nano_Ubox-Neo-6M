@@ -1,39 +1,99 @@
 ////////////////////////////////////////////////////////////////////////////////
-// radio.scad
+// gps.scad
 ////////////////////////////////////////////////////////////////////////////////
 
 // https://github.com/MuellerA/Thingiverse.git#ac669d2e31545f4aca594795901329ed9a7b87eb
 use <../../../3D Druck/Thingiverse/PCB/pcb.scad> ;
 
-pcb = "top" ; // [top,bottom,button]
+pcb = "all" ; // [top,bottom,button,all,testGps,testAnt]
 
+// see measure.svg
+
+gpsX = 36.5 ; // [15:0.1:45]
+gpsY = 27.3 ; // [15:0.1:45]
+
+antX = 26.5 ; // [5:0.1:40]
+antY = 26.5 ; // [5:0.1:40]
 
 /* [Hidden] */
 
-length = 46.5 + 32 ;
-width  = 33.0 ;
-wallWidth  =  0.8 ;
+nanoX  = 46.5 ;
+nanoY  = 20.5 ;
 
-$fn=40 ;
+minOX = 3 ;
+minOY = 3 ;
+dX    = 4 ;
 
-zBottom = 7 ;
-zTop    = 6.0 + 1.9 + 0.8 + 1 ;
+minGpsOX = 9 ;
 
-xOffsetLongan = -16 ;
-xOffsetGps    = -11 ;
-xOffsetAntenna = 23 ;
+wallWidth = 0.8 ;
+$fn = 40 ;
+
+// calc total size excl outer wall
+
+totTopX = 3*wallWidth + nanoX            + dX + antX + minOX ;
+totBotX = 4*wallWidth + minGpsOX + gpsX  + dX + antX + minOX ;
+
+totX = max(totTopX, totBotX) ;
+
+totNanY = 2*wallWidth + 2*minOY + nanoY ;
+totAntY = 2*wallWidth + 2*minOY + antY ;
+totGpsY = 2*wallWidth + 2*minOY + gpsY ;
+
+totY = max(totNanY, totAntY, totGpsY) ;
+
+// calc offsets
+
+offsetAntX = -antX/2 + totX - minOX - wallWidth ;
+offsetGpsX = -gpsX/2 + totX - minOX - antX - dX - 3*wallWidth ;
+
+////////////////////////////////////////////////////////////////////////////////
 
 module base(height)
 {
-  translate([0, 0, height/2])
+  translate([totX/2, 0, height/2])
     difference()
   {
     translate([0, 0, -wallWidth/2])
-      cube([length + 2*wallWidth, width + 2*wallWidth, height+wallWidth], center=true) ;
+      cube([totX+2*wallWidth, totY+2*wallWidth, height+wallWidth], center=true) ;
     translate([0, 0, +wallWidth/2])
-      cube([length + 0*wallWidth-0.01, width + 0*wallWidth-0.01, height+wallWidth+0.01], center=true) ;
+      cube([totX            , totY            , height+wallWidth], center=true) ;
   }
 }
+
+////////////////////////////////////////////////////////////////////////////////
+
+module antenna()
+{
+  antZ = 4 ;
+
+  difference()
+  {
+    translate([0, 0, antZ/2])
+      cube([antX+2*wallWidth, antY+2*wallWidth, antZ], center=true) ;
+
+    translate([0, 0, antZ/2])
+      cube([antX            , antY          , 2*antZ], center=true) ;
+    translate([-antX/2, 0, antZ/2])
+      cube([8, 4, 2*antZ], center=true) ;
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+module gps()
+{
+  pcbHeight  =  1.2 ;
+  wallWidth  =  0.8 ;
+  railHeight =  2.0 ;
+  railOffset =  8.0 ;
+
+  clip = [ 3, 3.5 ] ;
+  PcbHolder(gpsY, gpsX, pcbHeight, wallWidth, railHeight, railOffset,
+            clip=clip, fingerHoleEnable=true) ;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 
 module hooks(height, top)
 {
@@ -56,36 +116,36 @@ module hooks(height, top)
   p1 = (top) ? points[0] : points[1] ;
   p2 = (top) ? points[1] : points[0] ;
   
-  translate([+length/2-5, -width/2, height]) rotate([0, 0,   0]) hook(p1) ;
-  translate([0          , -width/2, height]) rotate([0, 0,   0]) hook(p2) ;
-  translate([-length/2+5, -width/2, height]) rotate([0, 0,   0]) hook(p1) ;
-  translate([+length/2-5, +width/2, height]) rotate([0, 0, 180]) hook(p1) ;
-  translate([0          , +width/2, height]) rotate([0, 0, 180]) hook(p2) ;
-  translate([-length/2+5, +width/2, height]) rotate([0, 0, 180]) hook(p1) ;
+  translate([+totX/2-5, -totY/2, height]) rotate([0, 0,   0]) hook(p1) ;
+  translate([0        , -totY/2, height]) rotate([0, 0,   0]) hook(p2) ;
+  translate([-totX/2+5, -totY/2, height]) rotate([0, 0,   0]) hook(p1) ;
+  translate([+totX/2-5, +totY/2, height]) rotate([0, 0, 180]) hook(p1) ;
+  translate([0        , +totY/2, height]) rotate([0, 0, 180]) hook(p2) ;
+  translate([-totX/2+5, +totY/2, height]) rotate([0, 0, 180]) hook(p1) ;
 
-  translate([+length/2  , -width/2+6  , height]) rotate([0, 0,  90]) hook(p1) ;
-  translate([+length/2  , +width/2-6  , height]) rotate([0, 0,  90]) hook(p1) ;
+  translate([+totX/2  , -totY/2+6  , height]) rotate([0, 0,  90]) hook(p1) ;
+  translate([+totX/2  , +totY/2-6  , height]) rotate([0, 0,  90]) hook(p1) ;
 
-  translate([-length/2  , -width/2+2.8, height]) rotate([0, 0, 270]) hook(p1) ;
-  translate([-length/2  , +width/2-2.8, height]) rotate([0, 0, 270]) hook(p1) ;
+  translate([-totX/2  , -totY/2+2.8, height]) rotate([0, 0, 270]) hook(p1) ;
+  translate([-totX/2  , +totY/2-2.8, height]) rotate([0, 0, 270]) hook(p1) ;
 }
+
+////////////////////////////////////////////////////////////////////////////////
 
 module top()
 {
-  pcbLength  = 46.5 ;
-  pcbWidth   = 20.5 ;
   pcbHeight  =  1.9 ;
   railHeight =  6.0 ;
   railOffset =  2.3 ;
 
-  height = zTop ; // == railHeight + pcbHeight + wallWidth + 1 ;
+  height = railHeight + pcbHeight + wallWidth + 1 ;
   
   dispLength = 23.9 ;
   dispWidth  = 13.5 ;
   dispOffset =  3.5 ;
 
   buttonD       = 3.0 ;
-  buttonLoffset = pcbLength / 2 - 8.9 ;
+  buttonLoffset = nanoX / 2 - 8.9 ;
   buttonWoffset = 3.5 ;
 
   usbWidth  = 9.9 ;
@@ -99,29 +159,30 @@ module top()
       // base
       base(height) ;
 
-      translate([xOffsetLongan, 0, 0])
+      // nano
+      translate([nanoX/2, 0, 0])
       {
         // pcb frame
         rotate([0, 0, 90])
-          PcbHolder(pcbLength, pcbWidth, pcbHeight, wallWidth, railHeight, railOffset,
-                    clip = [10, 5]) ;
+          PcbHolder(nanoX, nanoY, pcbHeight, wallWidth, railHeight, railOffset, clip = [10, 5]) ;
 
         translate([-dispLength/2+dispOffset-1.5*wallWidth, 0, 2/2]) cube([wallWidth, 20 , 2], center=true) ;
-      
+
         // button
         bd = buttonD + 2 * 0.4 ;
         translate([-buttonLoffset, buttonWoffset, 0.51]) cylinder(d=bd+2*wallWidth, h=1, center=true) ;
-
+        
         // reset
         translate([-buttonLoffset, -buttonWoffset, 0.51]) cylinder(d=bd+2*wallWidth, h=1, center=true) ;
       }
-      
-      translate([xOffsetAntenna, 0, 0]) Antenna() ;
+
+      // antenna
+      translate([offsetAntX, 0, 0]) antenna() ;
     }
 
     union()
     {
-      translate([xOffsetLongan, 0, 0])
+      translate([nanoX/2, 0, 0])
       {
         // display
         translate([dispOffset, 0, 0]) cube([dispLength, dispWidth, 10], center=true) ;
@@ -132,20 +193,67 @@ module top()
 
         // reset
         translate([-buttonLoffset, -buttonWoffset, 0]) cylinder(d=2, h=10, center=true) ;
-        
+
         // usb
-        translate([-length/2+17, 0, usbHeight/2+usbOffset])
-          cube([10, usbWidth, usbHeight], center=true) ;
+        translate([-nanoX/2, 0, usbHeight/2+usbOffset])
+          cube([5, usbWidth, usbHeight], center=true) ;
 
         // sdcard
-        translate([-length/2 + 10/2 - 2*wallWidth +12, 0, railHeight + pcbHeight + 2])
-          cube([10, 12, 4], center=true) ;
+        translate([-nanoX/2, 0, railHeight + pcbHeight + 2])
+          cube([5, 12, 4], center=true) ;
       }
     }
   }
 
-  hooks(height, true) ;
+  translate([totX/2, 0, 0])
+    hooks(height, true) ;
 }
+
+////////////////////////////////////////////////////////////////////////////////
+
+module bottom()
+{
+  sdcardX =  7 ;
+  sdcardY = 12 ;
+  
+  height = 7 ;
+
+  difference()
+  {
+    union()
+    {
+      // base
+      base(height) ;
+
+      // sdcard
+      translate([(sdcardX)/2, 0, height/2])
+        cube([sdcardX+2*wallWidth, sdcardY+2*wallWidth, height], center=true) ;
+
+      // gps
+      {
+        translate([offsetGpsX, 0, 0])
+          gps() ;
+      }
+      
+      // antenna
+      translate([offsetAntX, 0, 0]) antenna() ;
+    }
+
+    union()
+    {
+      // sdcard
+      translate([(sdcardX)/2-wallWidth, 0, height/2])
+        cube([sdcardX+2*wallWidth, sdcardY, height*2], center=true) ;
+      translate([sdcardX+wallWidth/2, 0, height])
+        cube([2*wallWidth, sdcardY, 2], center=true) ;
+    }
+  }   
+  
+  translate([totX/2, 0, 0])
+    hooks(height, false) ;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 
 module button()
 {
@@ -153,55 +261,7 @@ module button()
   cylinder(h=6, d=2.5) ;
 }
 
-module Antenna()
-{
-  len = 24 + 0.8;
-    
-  difference()
-  {
-    translate([0, 0, 2])
-      cube([len+2*wallWidth, len+2*wallWidth, 4], center=true) ;
-
-    translate([0, 0, 3])
-      cube([len            , len            , 6], center=true) ;
-    translate([-len/2, 0, 8/4])
-      cube([8, 4, 8], center=true) ;
-  }
-}
-  
-module bottom()
-{
-  sdcardX =  7 ;
-  sdcardY = 12 ;
-  
-  height = zBottom ;
-
-  difference()
-  {
-    union()
-    {
-      base(height) ;
-
-      // sdcard
-      translate([(-length+sdcardX)/2, 0, height/2])
-      cube([sdcardX+2*wallWidth, sdcardY+2*wallWidth, height], center=true) ;
-      translate([xOffsetGps    , 0, 0]) PcbUbloxNeo6Mblue() ;
-      translate([xOffsetAntenna, 0, 0]) Antenna() ;
-    }
-
-    union()
-    {
-      // sdcard
-      translate([(-length+sdcardX)/2-wallWidth, 0, height/2])
-      cube([sdcardX+2*wallWidth, sdcardY, height*2], center=true) ;
-
-      translate([-length/2+sdcardX+wallWidth/2, 0, height])
-        cube([2*wallWidth, sdcardY, 2], center=true) ;
-    }
-  }
-
-  hooks(height, false) ;
-}
+////////////////////////////////////////////////////////////////////////////////
 
 if (pcb == "top")
   top() ;
@@ -209,6 +269,24 @@ else if (pcb == "bottom")
   bottom() ;
 else if (pcb == "button")
   button() ;
+else if (pcb == "all")
+{
+  translate([0, -totY/2 - 5, 0]) bottom() ;
+  translate([0, +totY/2 + 5, 0]) top() ;
+  translate([-10, 0, -wallWidth]) button() ;
+}
+else if (pcb == "testGps")
+{
+  translate([0, 0, -wallWidth/2])
+    cube([gpsX+2*wallWidth, gpsY+2*wallWidth, wallWidth], center=true) ;
+  gps() ;
+}
+else if (pcb == "testAnt")
+{
+  translate([0, 0, -wallWidth/2])
+    cube([antX+2*wallWidth, antY+2*wallWidth, wallWidth], center=true) ;
+  antenna() ;
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // EOF
