@@ -25,7 +25,7 @@ The logfile format is compatible with [GPSBabel](http://www.gpsbabel.org/index.h
 gpsbabel -i unicsv -f 'yyymmdd-hhmmss.csv' -o kml -F 'yyymmdd-hhmmss.kml'
 ```
 
-The [example.csv](img/example.csv) converted to Google Earth:
+The [example.csv](img/example.csv) converted to Google Earth:  
 [<img src="img/example.jpg" alt="example" height="200px"/>](img/example.jpg)
 
 
@@ -38,7 +38,7 @@ Use the PlatformIO environment option to select which USART the GPS module is co
 pio run -e usart0 -t upload
 ```
 
-## 3D Print STL files
+## 3D Print STL Files
 
 [<img src="img/img10.png" alt="" height="200px"/>](img/img10.png) [<img src="img/img11.jpg" alt="" height="200px"/>](img/img11.jpg) [<img src="img/img12.jpg" alt="" height="200px"/>](img/img12.jpg) [<img src="img/img13.jpg" alt="" height="200px"/>](img/img13.jpg) [<img src="img/img14.jpg" alt="" height="200px"/>](img/img14.jpg)
 
