@@ -50,9 +50,17 @@ UbxId UbxId::NavTimeUtc(0x01, 0x21) ;
 UbxId UbxId::NavSvinfo (0x01, 0x30) ;
 
 UbxId UbxId::AckAck    (0x05, 0x01) ;
+UbxId UbxId::AckNak    (0x05, 0x00) ;
 
 UbxId UbxId::CfgPrt    (0x06, 0x00) ;
 UbxId UbxId::CfgMsg    (0x06, 0x01) ;
+
+////////////////////////////////////////////////////////////////////////////////
+
+UbxTx UbxCfgPrtUart::ubxTx()
+{
+  return UbxTx(UbxId::CfgPrt, std::vector<uint8_t>((uint8_t*)this, (uint8_t*)(this+1))) ;
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -444,7 +452,7 @@ bool UbxRx::is(const UbxId &ubxId, uint16_t len) const
 
 ////////////////////////////////////////////////////////////////////////////////
 
-bool ubxPoll(const UbxTx &tx)
+bool ubxSet(const UbxTx &tx)
 {
   TickTimer t(500) ;
   UbxRx rx ;
@@ -452,19 +460,50 @@ bool ubxPoll(const UbxTx &tx)
   while (true)
   {
     if (t())
+    {
+      TickTimer::delayMs(100) ;
       return false ;
+    }
 
     if (rx.poll())
     {
-      if (rx.valid() && rx.is(UbxId::AckAck) && ack(tx.ubxId(), rx.data()))
-        return true ;
-
+      if (rx.valid())
+      {
+        if ((rx.is(UbxId::AckAck) || rx.is(UbxId::AckNak)) && ack(tx.ubxId(), rx.data()))
+          return rx.is(UbxId::AckAck) ;
+      }
       rx.reset() ;
     }
   }
 }
 
-bool ubxTryBaud(uint32_t tryBaud)
+bool ubxPoll(const UbxTx &tx, std::vector<uint8_t> &rxData)
+{
+  TickTimer t(500) ;
+  UbxRx rx ;
+  tx.send() ;
+  rxData.clear() ;
+  while (true)
+  {
+    if (t())
+      return false ;
+
+    if (rx.poll())
+    {
+      if (rx.valid())
+      {
+        if (rx.is(tx.ubxId()))
+          rxData = rx.data() ;
+
+        if ((rx.is(UbxId::AckAck) || rx.is(UbxId::AckNak)) && ack(tx.ubxId(), rx.data()))
+          return rx.is(UbxId::AckAck) ;
+      }
+      rx.reset() ;
+    }
+  }
+}
+
+bool ubxTryBaud(uint32_t tryBaud, UbxCfgPrtUart &port)
 {
   UbxTx tx(UbxId::CfgPrt, std::vector<uint8_t>()) ;
   
@@ -474,16 +513,22 @@ bool ubxTryBaud(uint32_t tryBaud)
   
   usart.clear() ;
 
-  return ubxPoll(tx) ;
+  std::vector<uint8_t> data ;
+  if (!ubxPoll(tx, data) ||
+      data.size() != sizeof(port))
+    return false ;
+
+  port = *(UbxCfgPrtUart*)data.data() ;
+  return true ;
 }
 
-uint32_t ubxGetBaud(LcdArea &la)
+uint32_t ubxGetBaud(LcdArea &la, UbxCfgPrtUart &port)
 {
   std::vector<uint32_t> tryBauds{115200, 9600, 19200, 38400, 57600, 4800} ;
   for (uint32_t tryBaud : tryBauds)
   {
     la.clear() ; la.put("Probing ") ; la.put(tryBaud) ; la.put(" baud") ;
-    if (ubxTryBaud(tryBaud))
+    if (ubxTryBaud(tryBaud, port))
       return tryBaud ;
   }
   return 0 ;                   
@@ -491,15 +536,100 @@ uint32_t ubxGetBaud(LcdArea &la)
 
 void ubxSetup(LcdArea &la)
 {
-  UbxTx txCfgPrtUart1{ UbxId::CfgPrt, cfgPrtUart(1, 0b0000100011000000, 115200, 0b111, 0b001) } ;
-  
+  UbxCfgPrtUart port ;
+
+  usart.setup(9600) ;
+
+tryBaud:
+  uint32_t baud{0} ;
+  while (!baud)
+    baud = ubxGetBaud(la, port) ;
+
+  port.mode = 0b00'00'100'0'11'000000 ;
+  port.baudRate = 115200 ;
+  port.inProtoMask = 0b111 ;
+  port.outProtoMask = 0b001 ;
+  if (baud != 115200)
+  {
+    la.clear() ; la.put("Setting to 115200") ;
+    ubxSet(port.ubxTx()) ;
+
+    if (!ubxTryBaud(115200, port))
+      goto tryBaud ;
+  }
+  else
+  {
+    ubxSet(port.ubxTx()) ;
+  }
+
+  std::vector<uint8_t> rxData ;
+
+  if (port.portId != 0)
+  {
+    UbxCfgPrtUart portDdc ;
+    if (ubxPoll(UbxTx(UbxId::CfgPrt, { 0x00 }), rxData) && (rxData.size() == sizeof(portDdc)))
+    {
+      portDdc = *(UbxCfgPrtUart*)rxData.data() ;
+      portDdc.mode = 0b0000'0000 ;
+      portDdc.inProtoMask = 0b000 ;
+      portDdc.outProtoMask = 0b000 ;
+      ubxSet(portDdc.ubxTx()) ;
+    }
+  }
+
+  if (port.portId != 1)
+  {
+    UbxCfgPrtUart portUart1 ;
+    if (ubxPoll(UbxTx(UbxId::CfgPrt, { 0x01 }), rxData) && (rxData.size() == sizeof(portUart1)))
+    {
+      portUart1 = *(UbxCfgPrtUart*)rxData.data() ;
+      portUart1.mode = 0b0000'0000 ;
+      portUart1.inProtoMask = 0b000 ;
+      portUart1.outProtoMask = 0b000 ;
+      ubxSet(portUart1.ubxTx()) ;
+    }
+  }
+
+  if (port.portId != 2)
+  {
+    UbxCfgPrtUart portUart2 ;
+    if (ubxPoll(UbxTx(UbxId::CfgPrt, { 0x02 }), rxData) && (rxData.size() == sizeof(portUart2)))
+    {
+      portUart2 = *(UbxCfgPrtUart*)rxData.data() ;
+      portUart2.mode = 0b0000'0000 ;
+      portUart2.inProtoMask = 0b000 ;
+      portUart2.outProtoMask = 0b000 ;
+      ubxSet(portUart2.ubxTx()) ;
+    }
+  }
+
+  if (port.portId != 3)
+  {
+    UbxCfgPrtUart portUsb ;
+    if (ubxPoll(UbxTx(UbxId::CfgPrt, { 0x03 }), rxData) && (rxData.size() == sizeof(portUsb)))
+    {
+      portUsb = *(UbxCfgPrtUart*)rxData.data() ;
+      portUsb.inProtoMask = 0b000 ;
+      portUsb.outProtoMask = 0b000 ;
+      ubxSet(portUsb.ubxTx()) ;
+    }
+  }
+
+  if (port.portId != 4)
+  {
+    UbxCfgPrtUart portSpi ;
+    if (ubxPoll(UbxTx(UbxId::CfgPrt, { 0x04 }), rxData) && (rxData.size() == sizeof(portSpi)))
+    {
+      portSpi = *(UbxCfgPrtUart*)rxData.data() ;
+      portSpi.mode = 0b0000'0000 ;
+      portSpi.inProtoMask = 0b000 ;
+      portSpi.outProtoMask = 0b000 ;
+      ubxSet(portSpi.ubxTx()) ;
+    }
+  }
+
   std::vector<UbxTx> txCfg
     {
-      // cfg-prt // disable ports
-      { UbxId::CfgPrt, cfgPrtUart(2, 0b0000100011000000,   9600, 0b000, 0b000) },
-      { UbxId::CfgPrt, cfgPrtDdc(0b00000000, 0b000, 0b000) },
-      { UbxId::CfgPrt, cfgPrtUsb(0b000, 0b000) },
-      { UbxId::CfgPrt, cfgPrtSpi(0b00000000, 0b000, 0b000) },
       // cfg-msg
       { UbxId::CfgMsg, {UbxId::NavPosllh.clsId() , UbxId::NavPosllh.msgId() , 1}},
       { UbxId::CfgMsg, {UbxId::NavStatus.clsId() , UbxId::NavStatus.msgId() , 1}}, // NAV-STATUS
@@ -507,29 +637,10 @@ void ubxSetup(LcdArea &la)
       { UbxId::CfgMsg, {UbxId::NavTimeUtc.clsId(), UbxId::NavTimeUtc.msgId(), 1}}, // NAV-TIMEUTC
     } ;
 
-  usart.setup(9600) ;
-
- tryBaud:
-  uint32_t baud{0} ;
-  while (!baud)
-    baud = ubxGetBaud(la) ;
-  if (baud != 115200)
-  {
-    la.clear() ; la.put("Setting to 115200") ;
-    txCfgPrtUart1.send() ;
-
-    if (!ubxTryBaud(115200))
-      goto tryBaud ;
-  }
-  else
-  {
-    txCfgPrtUart1.send() ;
-  }
-  
   for (const UbxTx &tx : txCfg)
   {
-    la.clear() ; la.put("Configuring") ;
-    while (!ubxPoll(tx)) ;
+    la.clear() ; la.put("Configuring ") ;
+    while (!ubxSet(tx)) ;
   }
   la.clear() ;
 }

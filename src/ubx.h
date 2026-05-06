@@ -19,6 +19,9 @@ class LcdArea ;
 
 ////////////////////////////////////////////////////////////////////////////////
 
+class UbxRx ;
+class UbxTx ;
+
 class UbxId
 {
 public:
@@ -28,6 +31,7 @@ public:
   static UbxId NavSvinfo ;
   
   static UbxId AckAck ;
+  static UbxId AckNak ;
 
   static UbxId CfgPrt ;
   static UbxId CfgMsg ;
@@ -66,6 +70,8 @@ struct UbxCfgPrtUart
   uint16_t outProtoMask ;
   uint16_t reserved4 ;
   uint16_t reserved5 ;
+
+  UbxTx ubxTx() ;
 } ;
 
 ////////////////////////////////////////////////////////////////////////////////
