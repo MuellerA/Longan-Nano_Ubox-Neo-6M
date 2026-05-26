@@ -144,6 +144,7 @@ int main()
           case 0x03: ubxNav.status (ubxRx.data()) ; break ;
           case 0x21: ubxNav.timeUtc(ubxRx.data()) ; break ;
           case 0x30: ubxNav.svinfo (ubxRx.data()) ; break ;
+          case 0x35: ubxNav.sat    (ubxRx.data()) ; break ;
           }
         }
       }

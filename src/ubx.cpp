@@ -48,6 +48,7 @@ UbxId UbxId::NavPosllh (0x01, 0x02) ;
 UbxId UbxId::NavStatus (0x01, 0x03) ;
 UbxId UbxId::NavTimeUtc(0x01, 0x21) ;
 UbxId UbxId::NavSvinfo (0x01, 0x30) ;
+UbxId UbxId::NavSat    (0x01, 0x35) ;
 
 UbxId UbxId::AckAck    (0x05, 0x01) ;
 UbxId UbxId::AckNak    (0x05, 0x00) ;
@@ -81,12 +82,14 @@ UbxNav::UbxNav()
   _posllh.iTOW = ~0UL ;
   _status.iTOW = ~0UL ;
   _svinfo.iTOW = ~0UL ;
+  _sat.iTOW    = ~0UL ;
   _timeUtc.iTOW = ~0UL ;
 }
 
 bool UbxNav::posllhValid()  const { return valid(_posllh .iTOW, 10000) ; }
 bool UbxNav::statusValid()  const { return valid(_status .iTOW, 10000) ; }
 bool UbxNav::svinfoValid()  const { return valid(_svinfo .iTOW, 10000) ; }
+bool UbxNav::satValid()     const { return valid(_sat    .iTOW, 10000) ; }
 bool UbxNav::timeUtcValid() const { return valid(_timeUtc.iTOW,  5000) ; }
 
 bool UbxNav::valid() const
@@ -101,6 +104,8 @@ const UbxNavPosllh& UbxNav::posllh() const { return _posllh ; }
 const UbxNavStatus& UbxNav::status() const { return _status ; }
 const UbxNavSvinfo& UbxNav::svinfo() const { return _svinfo ; }
 const std::vector<UbxNavSvinfoRep>& UbxNav::svinfoRep() const { return _svinfoRep ; }
+const UbxNavSat& UbxNav::sat() const { return _sat ; }
+const std::vector<UbxNavSatRep>& UbxNav::satRep() const { return _satRep ; }
 const UbxNavTimeUtc& UbxNav::timeUtc() const { return _timeUtc ; }
 
 std::string UbxNav::timeUtcStr(bool compressed) const
@@ -174,14 +179,20 @@ std::string UbxNav::altStr() const
 
 uint8_t UbxNav::sats() const
 {
-  if (!svinfoValid())
-    return 0 ;
-  
   uint32_t sat{0} ;
-  for (const UbxNavSvinfoRep &svInfoRep : _svinfoRep)
-    if (svInfoRep.flags & 1)
-      sat += 1 ;
-  return sat ;  
+  if (svinfoValid())
+  {
+    for (const UbxNavSvinfoRep &svInfoRep : _svinfoRep)
+      if (svInfoRep.flags & 1)
+        sat += 1 ;
+  }
+  else if (satValid())
+  {
+    for (const UbxNavSatRep &satRep : _satRep)
+      if (satRep.flags & 0x08)
+        sat += 1 ;
+  }
+  return sat ;
 }
 
 bool UbxNav::posllh(const std::vector<uint8_t> &data)
@@ -208,6 +219,23 @@ bool UbxNav::svinfo(const std::vector<uint8_t> &data)
   _svinfoRep.reserve(_svinfo.numCh) ;
   for (uint8_t iCh = 0 ; iCh < _svinfo.numCh ; ++iCh)
     _svinfoRep.emplace_back(*(const UbxNavSvinfoRep*)(data.data() + sizeof(UbxNavSvinfo) + iCh * sizeof(UbxNavSvinfoRep))) ;
+  return true ;
+}
+
+bool UbxNav::sat(const std::vector<uint8_t> &data)
+{
+  if (data.size() < sizeof(UbxNavSat))
+    return false ;
+  const UbxNavSat *sat = (const UbxNavSat*) data.data() ;
+  if (data.size() < (sizeof(UbxNavSat) + sat->numSvs * sizeof(UbxNavSatRep)))
+    return false ;
+  
+  _sat = *(const UbxNavSat*) data.data() ;
+  tow(_sat.iTOW) ;
+  _satRep.clear() ;
+  _satRep.reserve(_sat.numSvs) ;
+  for (uint8_t iCh = 0 ; iCh < _sat.numSvs ; ++iCh)
+    _satRep.emplace_back(*(const UbxNavSatRep*)(data.data() + sizeof(UbxNavSat) + iCh * sizeof(UbxNavSatRep))) ;
   return true ;
 }
 
@@ -633,14 +661,23 @@ tryBaud:
       // cfg-msg
       { UbxId::CfgMsg, {UbxId::NavPosllh.clsId() , UbxId::NavPosllh.msgId() , 1}},
       { UbxId::CfgMsg, {UbxId::NavStatus.clsId() , UbxId::NavStatus.msgId() , 1}}, // NAV-STATUS
-      { UbxId::CfgMsg, {UbxId::NavSvinfo.clsId() , UbxId::NavSvinfo.msgId() , 1}}, // NAV-SVINFO
       { UbxId::CfgMsg, {UbxId::NavTimeUtc.clsId(), UbxId::NavTimeUtc.msgId(), 1}}, // NAV-TIMEUTC
     } ;
 
+  la.clear() ; la.put("Configuring") ;
   for (const UbxTx &tx : txCfg)
   {
-    la.clear() ; la.put("Configuring ") ;
-    while (!ubxSet(tx)) ;
+    for (size_t i = 0 ; (i < 5) && !ubxSet(tx) ; ++i) ;
+  }
+
+  {
+    UbxTx cfgMsgNavSat{ UbxId::CfgMsg, {UbxId::NavSat.clsId(), UbxId::NavSat.msgId(), 1}} ; // NAV-SAT
+    UbxTx cfgMsgNavSvinfo{ UbxId::CfgMsg, {UbxId::NavSvinfo.clsId(), UbxId::NavSvinfo.msgId(), 1}} ; // NAV-SVINFO
+    bool found{false} ;
+    for (size_t i = 0 ; (i < 5) && !found ; ++i)
+      found = ubxSet(cfgMsgNavSat) ;
+    for (size_t i = 0 ; (i < 5) && !found ; ++i)
+      found = ubxSet(cfgMsgNavSvinfo) ;
   }
   la.clear() ;
 }

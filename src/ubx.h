@@ -29,6 +29,7 @@ public:
   static UbxId NavStatus ;
   static UbxId NavTimeUtc ;
   static UbxId NavSvinfo ;
+  static UbxId NavSat ;
   
   static UbxId AckAck ;
   static UbxId AckNak ;
@@ -121,6 +122,26 @@ struct UbxNavSvinfoRep
   int32_t prRes ;
 } ;
 
+struct UbxNavSat
+{
+  mutable
+  uint32_t iTOW ; // ms
+  uint8_t  version ; // 1
+  uint8_t  numSvs ;
+  uint16_t reserved ;
+} ;
+
+struct UbxNavSatRep
+{
+  uint8_t  gnssId ;
+  uint8_t  svId ;
+  uint8_t  cno ;
+  int8_t   elev ;
+  int16_t  azim ;
+  int16_t  prRes ;
+  uint32_t flags ;
+} ;
+
 struct UbxNavTimeUtc
 {
   mutable
@@ -144,6 +165,7 @@ public:
   bool posllhValid() const ;
   bool statusValid() const ;
   bool svinfoValid() const ;
+  bool satValid() const ;
   bool timeUtcValid() const ;
   bool valid() const ;
   uint32_t lastTow() const ;
@@ -151,6 +173,8 @@ public:
   const UbxNavStatus& status() const ;
   const UbxNavSvinfo& svinfo() const ;
   const std::vector<UbxNavSvinfoRep>& svinfoRep() const ;
+  const UbxNavSat& sat() const ;
+  const std::vector<UbxNavSatRep>& satRep() const ;
   const UbxNavTimeUtc& timeUtc() const ;
   std::string timeUtcStr(bool compressed = false) const ;
   std::string latStr() const ;
@@ -160,6 +184,7 @@ public:
   
   bool posllh(const std::vector<uint8_t> &data) ;
   bool svinfo(const std::vector<uint8_t> &data) ;
+  bool sat(const std::vector<uint8_t> &data) ;
   bool status(const std::vector<uint8_t> &data) ;
   bool timeUtc(const std::vector<uint8_t> &data) ;
 
@@ -174,6 +199,8 @@ private:
   UbxNavStatus _status ;
   UbxNavSvinfo _svinfo ;
   std::vector<UbxNavSvinfoRep> _svinfoRep ;
+  UbxNavSat    _sat ;
+  std::vector<UbxNavSatRep> _satRep ;
   UbxNavTimeUtc _timeUtc ;
 } ;
 

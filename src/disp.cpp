@@ -169,6 +169,18 @@ void DispSats::display(const UbxNav &nav, bool force)
       _la.clearEOL() ;
     }
   }
+  else if (nav.satValid())
+  {
+    const UbxNavSat &sat = nav.sat() ;
+    if ((_iTOW != sat.iTOW) || force)
+    {
+      _iTOW = sat.iTOW ;
+
+      _la.txtPos(0) ;
+      _la.put(nav.sats()) ;
+      _la.clearEOL() ;
+    }
+  }
   else
   {
     if ((_iTOW != ~0UL) || force)
@@ -210,6 +222,55 @@ void DispSvInfo::display(const UbxNav &nav, bool force)
           else
             _la.color(0xffffff, 0x000000) ;
           _la.put(svInfoRep.cno, 2, ' ') ;
+        }
+        else
+        {
+          _la.color(0xffffff, 0x000000) ;
+          _la.put(" -") ;
+        }
+        
+        r += 1 ;
+        if (r > 3)
+        {
+          r = 0 ;
+          c += 1 ;
+        }
+        if (c > 4)
+          break ;
+      }
+      _la.color(0xffffff, 0x000000) ;
+      while (c < 5)
+      {
+        _la.txtPos(r, c*4) ;
+        _la.put("  ") ;
+        r += 1 ;
+        if (r > 3)
+        {
+          r = 0 ;
+          c += 1 ;
+        }
+      }
+    }
+  }
+  else if (nav.satValid())
+  {
+    const UbxNavSat &sat = nav.sat() ;
+    if ((_iTOW != sat.iTOW) || force)
+    {
+      _iTOW = sat.iTOW ;
+
+      uint8_t r{0} ;
+      uint8_t c{0} ;
+      for (const UbxNavSatRep &satRep : nav.satRep())
+      {
+        _la.txtPos(r, c*4) ;
+        if ((satRep.flags & 0x07) >= 2)
+        {
+          if (satRep.flags & 0x08)
+            _la.color(0xffffff, 0x008080) ;
+          else
+            _la.color(0xffffff, 0x000000) ;
+          _la.put(satRep.cno, 2, ' ') ;
         }
         else
         {
