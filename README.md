@@ -1,6 +1,6 @@
 # GPS Receiver and Logger
 
-Using a ```u-blox NEO-6M``` GPS module and a ```Longan Nano``` to display and record UTC time and GPS position data.
+Using ```Longan Nano``` with an ```u-blox``` GPS module to display and record UTC time and GPS position data. The GPS receiver must implement the ubx protocol, tested with u-blox 6, 7, 10.
 
 ## Usage
 
